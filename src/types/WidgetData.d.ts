@@ -1,5 +1,5 @@
 import { DataTypes, WidgetType } from "./WidgetDataEnums";
-import { DBBase } from "./HealthData";
+import { DBBase } from "./Prisma";
 
 export interface Widget {
   id: number;
@@ -14,7 +14,6 @@ export interface Widget {
   };
 }
 
-
 interface Layout {
   userId: number;
   layout: LayoutInternal;
@@ -23,9 +22,8 @@ interface Layout {
   user?: User;
 }
 
-interface LayoutInternal {
+export interface LayoutInternal {
   widgets?: Widget[];
-  gridSize?: number;
 }
 
 export interface DBLayout extends Layout, DBBase {

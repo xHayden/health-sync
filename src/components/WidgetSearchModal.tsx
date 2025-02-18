@@ -15,24 +15,19 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "@radix-ui/react-icons";
 import widgetRegistry, { WidgetMeta } from "@/lib/widgetRegistry";
 import { WidgetType, WidgetTypes } from "@/types/WidgetDataEnums";
-
+import { useStore } from "@/lib/store/layoutStore";
 // Create an array of [widgetTypeKey, widgetMeta] entries.
 const widgetEntries = Object.entries(widgetRegistry) as [
   WidgetType["value"],
   WidgetMeta
 ][];
 
-interface WidgetSearchModalProps {
-  createWidget: (widgetType: WidgetType) => void;
-}
-
-const WidgetSearchModal: React.FC<WidgetSearchModalProps> = ({
-  createWidget,
-}) => {
+const WidgetSearchModal = () => {
   const [query, setQuery] = useState("");
   const [selectedWidgetKey, setSelectedWidgetKey] = useState<
     WidgetType["value"] | null
   >(null);
+  const createWidget = useStore((state) => state.createWidget);
 
   const filteredEntries = widgetEntries.filter(([, widget]) =>
     widget.name.toLowerCase().includes(query.toLowerCase())
@@ -46,7 +41,7 @@ const WidgetSearchModal: React.FC<WidgetSearchModalProps> = ({
     <Dialog>
       <DialogTrigger className="fixed bottom-4 right-4 z-50" asChild>
         <Button
-          className="absolute group flex items-center p-3 overflow-visible"
+          className="group flex items-center p-3 overflow-visible"
         >
           <span className="transition-transform duration-300 group-hover:rotate-90 w-4 h-4">
             <PlusIcon fontWeight="bold" className="w-4 h-4" />

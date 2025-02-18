@@ -118,6 +118,7 @@ export interface WorkoutChartProps {
 const WorkoutChart: React.FC<WorkoutChartProps> = ({ workoutSummaries }) => {
   // Manage the slider state (days to show)
   const [days, setDays] = useState(30);
+  // console.log("Rendering WorkoutChart");
 
   // Filter data to show only the last `days` worth of entries.
   const filteredData = useMemo(() => {

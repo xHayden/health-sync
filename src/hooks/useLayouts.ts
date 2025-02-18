@@ -1,48 +1,49 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import { Session } from "next-auth";
 
 const fetchLayouts = async (userId: number) => {
   const { data } = await axios.get(`/api/v1/layouts?userId=${userId}`);
   return data.data;
 };
 
-export const useLayouts = (userId: number, enabled: boolean) => {
+export const useLayouts = (user: Session["user"], enabled: boolean) => {
   return useQuery({
-    queryKey: ["layouts", userId],
-    queryFn: () => fetchLayouts(userId),
-    enabled: !!userId && enabled,
+    queryKey: ["layouts", user.id],
+    queryFn: () => fetchLayouts(user.id),
+    enabled: !!user.id && enabled,
   });
 };
 
-export const useCreateLayout = (userId: number) => {
+export const useCreateLayout = (user: Session["user"]) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (newLayout: Record<string, any>) =>
-      axios.post("/api/v1/layouts", { ...newLayout, userId }),
+      axios.post("/api/v1/layouts", { ...newLayout, userId: user.id }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["layouts", userId] });
+      queryClient.invalidateQueries({ queryKey: ["layouts", user.id] });
     },
   });
 };
 
-export const useUpdateLayout = (userId: number) => {
+export const useUpdateLayout = (user: Session["user"]) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (updatedLayout: { id: number; [key: number]: any }) =>
-      axios.patch("/api/v1/layouts", { ...updatedLayout, userId }),
+      axios.patch("/api/v1/layouts", { ...updatedLayout, userId: user.id }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["layouts", userId] });
+      queryClient.invalidateQueries({ queryKey: ["layouts", user.id] });
     },
   });
 };
 
-export const useDeleteLayout = (userId: number) => {
+export const useDeleteLayout = (user: Session["user"]) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
-      axios.delete(`/api/v1/layouts?id=${id}&userId=${userId}`),
+      axios.delete(`/api/v1/layouts?id=${id}&userId=${user.id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["layouts", userId] });
+      queryClient.invalidateQueries({ queryKey: ["layouts", user.id] });
     },
   });
 };

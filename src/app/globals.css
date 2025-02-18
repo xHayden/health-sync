@@ -191,3 +191,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+.calendar-container {
+  container-type: inline-size;
+  container-name: calendar;
+}
+
+@container calendar (max-width: 768px) {
+  .calendar-container {
+    container-type: inline-size;
+  }
+}

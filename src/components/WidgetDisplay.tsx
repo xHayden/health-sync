@@ -6,13 +6,14 @@ import { useWorkoutSummaries } from "@/hooks/useWorkoutSummaries";
 import { useSleepSummaries } from "@/hooks/useSleepSummaries";
 import { ActivityCalendarProps } from "./widgets/ActivityCalendar";
 import { DBDailyWorkoutSummary } from "@/types/HealthData";
+import { Session } from "next-auth";
 
 interface WidgetDisplayProps {
   widget: Widget;
-  userId: number;
+  user: Session["user"];
 }
 
-export default function WidgetDisplay({ widget, userId }: WidgetDisplayProps) {
+export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   // Look up the meta info and the actual component from the registry.
   const widgetMeta = widgetRegistry[widget.type.value];
   const WidgetComponent = widgetMeta.component;
@@ -34,7 +35,7 @@ export default function WidgetDisplay({ widget, userId }: WidgetDisplayProps) {
     isLoading: isLoadingWorkout,
     error: workoutError,
   } = useWorkoutSummaries(
-    userId,
+    user.id,
     needsWorkoutData || needsActivityDaysLevelsData
   );
 
@@ -42,7 +43,7 @@ export default function WidgetDisplay({ widget, userId }: WidgetDisplayProps) {
     data: sleepData,
     isLoading: isLoadingSleep,
     error: sleepError,
-  } = useSleepSummaries(userId, needsSleepData);
+  } = useSleepSummaries(user.id, needsSleepData);
 
   // Optionally handle errors.
   if (workoutError || sleepError) {

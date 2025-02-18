@@ -18,10 +18,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const dehydratedState = {}; // TODO: get dehydrated state from server, pass it to the QueryProvider. Can use dehydrate() to get the state.
-  
+
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(inter.className, "h-screen bg-background text-foreground")}>
+      <body
+        className={cn(
+          inter.className,
+          "h-screen bg-background text-foreground"
+        )}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -14,8 +14,8 @@ import {
   Workout,
 } from "@/types/HealthData";
 import { calculateAndStoreWorkoutSummaries } from "./fitnessCalc";
-import { Layout, DBLayout } from "@/types/WidgetData";
-import prisma from "./prisma";
+import { Layout, DBLayout, LayoutInternal } from "@/types/WidgetData";
+import prisma from "../lib/prisma";
 
 export class DBAdapter {
   private constructor() {}
@@ -814,15 +814,15 @@ async function getLayouts(userId: number): Promise<DBLayout[]> {
  */
 async function createLayout(
   userId: number,
-  layout: Layout
+  data: DBLayout
 ): Promise<DBLayout> {
   const newRecord = await DBAdapter.getPrismaClient().layout.create({
     data: {
       userId,
-      layout, // stored as JSON
-    },
+      layout: data.layout, // stored as JSON
+    } as Layout,
   });
-  return newRecord.layout as DBLayout;
+  return newRecord as DBLayout;
 }
 
 /**

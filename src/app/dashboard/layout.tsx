@@ -1,18 +1,17 @@
-import DashboardMenubar from "@/components/DashboardMenubar";
-import LayoutProvider from "@/components/LayoutContext";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../api/auth/[...nextauth]/route";
 
-const DashboardLayout = ({
-  children,
-}: {
-  children: React.ReactNode;
-  // todo: get user id from session
-}) => {
+const DashboardLayout = async ({ children }: { children: React.ReactNode }) => {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user) {
+    redirect("/login");
+    return null;
+  }
+
   return (
     <section>
-      <LayoutProvider userId={1} enabled={true}>
-        <DashboardMenubar userId={1} />
-        {children}
-      </LayoutProvider>
+      {children}
     </section>
   );
 };
