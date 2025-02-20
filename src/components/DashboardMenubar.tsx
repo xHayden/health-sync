@@ -12,9 +12,9 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { Button } from "./ui/button";
-import { PlusIcon, TrashIcon } from "@radix-ui/react-icons";
+import { PlusIcon, TrashIcon, Pencil2Icon } from "@radix-ui/react-icons";
 import { useStore } from "@/lib/store/layoutStore";
-import { DBLayout, Widget } from "@/types/WidgetData";
+import { DBLayout } from "@/types/WidgetData";
 import {
   Dialog,
   DialogContent,
@@ -40,15 +40,27 @@ export function LayoutBar({
   const createLayout = useStore((state) => state.createLayout);
   const hasLayoutChanged = useStore((state) => state.hasLayoutChanged);
   const deleteLayout = useStore((state) => state.deleteLayout);
+  const updateLayoutName = useStore((state) => state.updateLayoutName);
 
   // State to hold the layout ID selected for deletion
   const [layoutToDelete, setLayoutToDelete] = useState<number | null>(null);
+  // State for editing the layout name
+  const [layoutToEdit, setLayoutToEdit] = useState<number | null>(null);
+  const [newLayoutName, setNewLayoutName] = useState("");
 
   // Confirm deletion: delete the layout then close the modal
   const confirmDelete = () => {
     if (layoutToDelete !== null) {
       deleteLayout(layoutToDelete, user);
       setLayoutToDelete(null);
+    }
+  };
+
+  // Function to save the new layout name
+  const handleSaveLayoutName = () => {
+    if (layoutToEdit !== null) {
+      updateLayoutName(layoutToEdit, newLayoutName, user);
+      setLayoutToEdit(null);
     }
   };
 
@@ -64,36 +76,48 @@ export function LayoutBar({
             editMode ? (
               <div
                 key={layout.id}
-                className={`flex justify-between  hover:bg-accent
-                items-center border rounded-md border-b-0 rounded-b-none 
-                *:w-max *:bg-transparent *:text-accent-foreground 
-                *:cursor-pointer *:hover:bg-transparent ${currentLayout?.id === layout.id ? "bg-accent" : "bg-background"}`}
+                className={`flex justify-between hover:bg-accent items-center border rounded-md border-b-0 rounded-b-none 
+                *:w-max *:bg-transparent *:text-accent-foreground *:cursor-pointer *:hover:bg-transparent ${
+                  currentLayout?.id === layout.id
+                    ? "bg-accent"
+                    : "bg-background"
+                }`}
               >
                 <Button
-                  className="pl-4 pr-2"
+                  className="pl-3 pr-2 flex items-center gap-1"
                   onClick={() => switchLayout(layout.id, user)}
                 >
-                  Layout {index + 1}
+                  {layout.name || `Layout ${index + 1}`}
                   {hasLayoutChanged && currentLayout?.id === layout.id && (
-                    <span className="text-accent">*</span>
+                    <span className="text-muted-foreground text-xs">(edited)</span>
                   )}
                 </Button>
                 <Button
                   size="icon"
-                  className="px-2 hover:text-red-500"
+                  className="hover:text-accent-foreground/70 flex items-center justify-center"
+                  onClick={() => {
+                    setLayoutToEdit(layout.id);
+                    setNewLayoutName(layout.name || `Layout ${index + 1}`);
+                  }}
+                >
+                  <Pencil2Icon className="w-full h-full" />
+                </Button>
+                <Button
+                  size="icon"
+                  className="pl-2 pr-2 hover:text-red-500 flex items-center justify-center"
                   onClick={() => setLayoutToDelete(layout.id)}
                 >
-                  <TrashIcon className="w-4 h-4" />
+                  <TrashIcon className="w-full h-full" />
                 </Button>
               </div>
             ) : (
               <Button
+                key={layout.id}
                 variant="outline"
                 className="border-b-0 rounded-b-none"
                 onClick={() => switchLayout(layout.id, user)}
-                key={layout.id}
               >
-                Layout {index + 1}
+                {layout.name || `Layout ${index + 1}`}
               </Button>
             )
           )}
@@ -127,6 +151,42 @@ export function LayoutBar({
             </Button>
             <Button variant="destructive" onClick={confirmDelete}>
               Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Layout Name Modal */}
+      <Dialog
+        open={layoutToEdit !== null}
+        onOpenChange={(open) => {
+          if (!open) setLayoutToEdit(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Layout Name</DialogTitle>
+            <DialogDescription>
+              Enter a new name for your layout.
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            type="text"
+            className="w-full p-2 mt-2 border rounded-md"
+            value={newLayoutName}
+            onChange={(e) => setNewLayoutName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleSaveLayoutName();
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setLayoutToEdit(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleSaveLayoutName}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -181,8 +241,8 @@ export default function DashboardMenubar({
         window.print();
       } else if (isCommand && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (currentLayout && currentLayout.layout?.widgets) {
-          saveLayout(currentLayout.id, currentLayout.layout.widgets, user);
+        if (currentLayout && currentLayout.widgets) {
+          saveLayout(currentLayout.id, user);
         }
       }
     };
@@ -204,17 +264,9 @@ export default function DashboardMenubar({
               Print <MenubarShortcut>⌘P</MenubarShortcut>
             </MenubarItem>
             {currentLayout &&
-              currentLayout.layout?.widgets &&
-              currentLayout.layout.widgets.length > 0 && (
-                <MenubarItem
-                  onClick={() =>
-                    saveLayout(
-                      currentLayout.id,
-                      currentLayout.layout.widgets as Widget[],
-                      user
-                    )
-                  }
-                >
+              currentLayout.widgets &&
+              currentLayout.widgets.length > 0 && (
+                <MenubarItem onClick={() => saveLayout(currentLayout.id, user)}>
                   Save Layout <MenubarShortcut>⌘S</MenubarShortcut>
                 </MenubarItem>
               )}

@@ -13,36 +13,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PlusIcon } from "@radix-ui/react-icons";
-import widgetRegistry, { WidgetMeta } from "@/lib/widgetRegistry";
-import { WidgetType, WidgetTypes } from "@/types/WidgetDataEnums";
+// Import the consolidated widgetRegistry, its entries, and the literal widget key type.
+import widgetRegistry, { WidgetValue } from "@/lib/widgetRegistry";
 import { useStore } from "@/lib/store/layoutStore";
-// Create an array of [widgetTypeKey, widgetMeta] entries.
-const widgetEntries = Object.entries(widgetRegistry) as [
-  WidgetType["value"],
-  WidgetMeta
-][];
 
 const WidgetSearchModal = () => {
+  // State to track the search query and selected widget key.
   const [query, setQuery] = useState("");
-  const [selectedWidgetKey, setSelectedWidgetKey] = useState<
-    WidgetType["value"] | null
-  >(null);
+  const [selectedWidgetKey, setSelectedWidgetKey] = useState<WidgetValue | null>(null);
   const createWidget = useStore((state) => state.createWidget);
 
-  const filteredEntries = widgetEntries.filter(([, widget]) =>
+  // Filter the widget entries based on the search query.
+  const filteredEntries = Object.entries(widgetRegistry).filter(([, widget]) =>
     widget.name.toLowerCase().includes(query.toLowerCase())
   );
 
-  const selectedWidgetMeta = selectedWidgetKey
-    ? widgetRegistry[selectedWidgetKey]
-    : null;
+  // Get the widget metadata for the selected key.
+  const selectedWidgetMeta = selectedWidgetKey ? widgetRegistry[selectedWidgetKey] : null;
 
   return (
     <Dialog>
       <DialogTrigger className="fixed bottom-4 right-4 z-50" asChild>
-        <Button
-          className="group flex items-center p-3 overflow-visible"
-        >
+        <Button className="group flex items-center p-3 overflow-visible">
           <span className="transition-transform duration-300 group-hover:rotate-90 w-4 h-4">
             <PlusIcon fontWeight="bold" className="w-4 h-4" />
           </span>
@@ -68,29 +60,21 @@ const WidgetSearchModal = () => {
                 {filteredEntries.map(([key, widget]) => (
                   <li
                     key={key}
-                    onClick={() => setSelectedWidgetKey(key)}
+                    onClick={() => setSelectedWidgetKey(key as WidgetValue)}
                     className={`cursor-pointer flex justify-between items-center p-3 rounded border hover:bg-foreground/10 ${
                       selectedWidgetKey === key ? "bg-foreground/10" : ""
                     }`}
                   >
                     <div className="flex flex-col">
                       <h3 className="font-medium">{widget.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {widget.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{widget.description}</p>
                     </div>
                     <div className="flex justify-end">
                       {selectedWidgetKey === key && (
                         <Button
                           className="bg-primary text-primary-foreground hover:bg-primary/90"
-                          onClick={() => {
-                            const widgetType = Object.values(WidgetTypes).find(
-                              (widgetType) => widgetType.value === key
-                            );
-                            if (widgetType) {
-                              createWidget(widgetType);
-                            }
-                          }}
+                          // Directly pass the widget key to createWidget.
+                          onClick={() => createWidget(key)}
                         >
                           <PlusIcon className="w-4 h-4" />
                         </Button>
@@ -107,9 +91,7 @@ const WidgetSearchModal = () => {
                     {selectedWidgetMeta.name} Preview
                   </h3>
                   <div className="w-full h-full max-h-[50vh] overflow-y-auto">
-                    <selectedWidgetMeta.component
-                      {...selectedWidgetMeta.dummyData}
-                    />
+                    <selectedWidgetMeta.component {...selectedWidgetMeta.dummyData} />
                   </div>
                 </>
               ) : (

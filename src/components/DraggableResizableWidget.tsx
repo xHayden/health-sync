@@ -11,6 +11,26 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import widgetRegistry, {
+  SelectWidgetSetting,
+  WidgetMeta,
+  WidgetSetting,
+  WidgetValue,
+} from "@/lib/widgetRegistry";
+import { Widget } from "@/types/WidgetData";
+import WidgetDisplay from "./WidgetDisplay";
+import { Session } from "next-auth";
+import { useStore } from "@/lib/store/layoutStore";
 
 export type DraggableResizableWidgetProps = {
   id: number;
@@ -19,24 +39,24 @@ export type DraggableResizableWidgetProps = {
   width: number;
   height: number;
   gridSize: number;
-  children: React.ReactNode;
   editMode: boolean;
   onResizeStop: (width: number, height: number) => void;
   onResizeStart?: () => void;
   onRemove: () => void;
+  widget: Widget;
+  user: Session["user"];
 };
 
 const WidgetOptionsMenu: React.FC<{
   onSettingsClick: (e: React.MouseEvent) => void;
-  onRemoveClick: (e: React.MouseEvent) => void;
-}> = React.memo(({ onSettingsClick, onRemoveClick }) => {
+}> = React.memo(({ onSettingsClick }) => {
   return (
     <div className="absolute top-0 right-0 z-50 m-3">
       <Button
         className="bg-secondary text-secondary-foreground border-secondary-foreground border hover:bg-primary hover:text-primary-foreground transition-colors duration-200 rounded-4xl"
         onClick={onSettingsClick}
       >
-        Edit
+        Settings
       </Button>
     </div>
   );
@@ -49,11 +69,12 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
   width,
   height,
   gridSize,
-  children,
   onResizeStop,
   onResizeStart,
   onRemove,
   editMode,
+  widget,
+  user,
 }) => {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id,
@@ -95,7 +116,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
         style={{
           ["--handle-size" as string]: "3.5rem",
           ["--handle-border" as string]: "4px",
-          ["--handle-color" as string]: "#fff",
+          ["--handle-color" as string]: "var(--primary)",
           width: "var(--handle-size)",
           height: "var(--handle-size)",
         }}
@@ -142,6 +163,33 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     [onResizeStop]
   );
 
+  // Save settings by updating the "value" property (not defaultValue)
+  const handleSaveSettings = useCallback(() => {
+    // TODO: Add check to ensure that the settings are valid.
+    const newSettings = widget.settings.map((setting) => {
+      const input = document.getElementById(
+        setting.key
+      ) as HTMLInputElement | null;
+      if (!input) return setting;
+      let newValue;
+      if (setting.type === "boolean") {
+        newValue = input.ariaChecked; // not sure why this needs to be ariaChecked
+      } else if (setting.type === "number") {
+        newValue = Number(input.value);
+      } else {
+        newValue = input.value;
+      }
+      return { ...setting, value: newValue };
+    });
+    const { updateWidgetSettings, currentLayout, saveLayout } =
+      useStore.getState();
+    updateWidgetSettings(widget.id, newSettings as WidgetSetting[]);
+    if (currentLayout) {
+      saveLayout(currentLayout.id, user);
+    }
+    setOpenSettings(false);
+  }, [widget, user]);
+
   if (editMode) {
     return (
       <>
@@ -159,21 +207,22 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className="relative w-full h-full bg-background border-2 border-foreground rounded-4xl shadow"
+            className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow"
           >
             <WidgetOptionsMenu
               onSettingsClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setOpenSettings(true);
               }}
-              onRemoveClick={(e) => {
-                e.stopPropagation();
-                setOpenConfirm(true);
-              }}
             />
-            {children}
+            <div className="w-full h-full flex items-center justify-center">
+              <WidgetDisplay widget={widget} user={user} />
+            </div>
           </div>
         </ResizableBox>
+
+        {/* Confirm Removal Dialog */}
         <Dialog open={openConfirm} onOpenChange={setOpenConfirm}>
           <DialogContent>
             <DialogHeader>
@@ -198,21 +247,114 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Settings Dialog with Save Settings option */}
         <Dialog open={openSettings} onOpenChange={setOpenSettings}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Widget Settings</DialogTitle>
               <DialogDescription>
-                Configure your widget settings below.
+                (Configure settings for{" "}
+                {widgetRegistry[widget.type as WidgetValue].name})
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Settings content goes here.
-              </p>
+              {widget.settings?.map((setting: WidgetSetting) => {
+                return (
+                  <div key={setting.key} className="flex flex-col space-y-1">
+                    <Label
+                    htmlFor={setting.key}
+                    className="text-sm font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                  >
+                    {setting.label}
+                  </Label>
+                  {setting.type === "boolean" ? (
+                    <Checkbox
+                      id={setting.key}
+                      defaultChecked={
+                        (typeof setting.value !== "undefined"
+                          ? setting.value === "true"
+                          : setting.defaultValue === "true") as boolean
+                      }
+                    />
+                  ) : setting.type === "text" ? (
+                    <Input
+                      id={setting.key}
+                      type="text"
+                      defaultValue={
+                        (setting.value as string) ??
+                        (setting.defaultValue as string)
+                      }
+                    />
+                  ) : setting.type === "number" ? (
+                    <Input
+                      id={setting.key}
+                      type="number"
+                      defaultValue={
+                        (setting.value as number) ??
+                        (setting.defaultValue as number)
+                      }
+                    />
+                  ) : setting.type === "select" ? (
+                    <Select
+                      defaultValue={
+                        (setting.value as string) ??
+                        (setting.defaultValue as string)
+                      }
+                    >
+                      <SelectTrigger id={setting.key}>
+                        <SelectValue placeholder="Select an option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(setting as SelectWidgetSetting).options.map(
+                          (option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                  ) : setting.type === "color" ? (
+                    <Input
+                      id={setting.key}
+                      className="w-12 h-8"
+                      type="color"
+                      defaultValue={
+                        (setting.value as string) ??
+                        (setting.defaultValue as string)
+                      }
+                    />
+                  ) : null}
+                  {setting.description && (
+                    <small className="text-xs text-muted-foreground">
+                      {setting.description}
+                    </small>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <DialogFooter>
-              <Button variant="secondary" onClick={() => setOpenSettings(false)}>
+              <Button variant="default" onClick={handleSaveSettings}>
+                Save Settings
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  onRemove();
+                  setOpenSettings(false);
+                }}
+              >
+                Delete Widget
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setOpenSettings(false)}
+              >
                 Close
               </Button>
             </DialogFooter>
@@ -223,15 +365,21 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
   } else {
     return (
       <div
-        style={{ ...style, width: currentSize.width, height: currentSize.height }}
+        style={{
+          ...style,
+          width: currentSize.width,
+          height: currentSize.height,
+        }}
       >
         <div
           ref={setNodeRef}
           {...listeners}
           {...attributes}
-          className="relative w-full h-full bg-background border-2 border-foreground rounded-4xl shadow"
+          className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow"
         >
-          {children}
+          <div className="w-full h-full flex items-center justify-center">
+            <WidgetDisplay widget={widget} user={user} />
+          </div>
         </div>
       </div>
     );

@@ -46,7 +46,7 @@ function Calendar({
         // The day button fills its cell and is square (aspect-square)
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "w-full h-full aspect-square text-[clamp(0.5rem,6cqw,1.5rem)]"
+          "w-full h-full rounded-full aspect-square text-[clamp(0.5rem,6cqw,1.5rem)]"
         ),
         day_range_start: "day-range-start",
         day_range_end: "day-range-end",

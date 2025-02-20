@@ -1,29 +1,27 @@
-import { DataTypes, WidgetType } from "./WidgetDataEnums";
+import { WidgetMetaDataTypes, WidgetSetting } from "@/lib/widgetRegistry";
 import { DBBase } from "./Prisma";
 
 export interface Widget {
   id: number;
-  type: WidgetType;
+  type: WidgetRequiredData;
   x: number;
   y: number;
   width: number;
   height: number;
-  requiredData: DataTypes[];
+  requiredData: WidgetMetaDataTypes[];
   data: {
-    [value in DataTypes]: any;
+    [value in WidgetMetaDataTypes]?: any;
   };
+  settings: WidgetSetting[];
 }
 
 interface Layout {
   userId: number;
-  layout: LayoutInternal;
+  widgets: Widget[];
+  name?: string;
   createdAt: Date;
   updatedAt: Date;
   user?: User;
-}
-
-export interface LayoutInternal {
-  widgets?: Widget[];
 }
 
 export interface DBLayout extends Layout, DBBase {

@@ -14,7 +14,7 @@ import {
   Workout,
 } from "@/types/HealthData";
 import { calculateAndStoreWorkoutSummaries } from "./fitnessCalc";
-import { Layout, DBLayout, LayoutInternal } from "@/types/WidgetData";
+import { Layout, DBLayout } from "@/types/WidgetData";
 import prisma from "../lib/prisma";
 
 export class DBAdapter {
@@ -477,7 +477,7 @@ async function insertSleepSummaries(userId: number): Promise<SleepSession[]> {
 
 async function insertHealthData(data: HistoricalHealthData): Promise<void> {
   try {
-    const userId = await getUserIdOrCreate("example@example.com");
+    const userId = 6;
     // Insert each type of health data with a category field
     await insertUniqueHealthDataPoints(userId, "step_counts", data.stepCount);
     await insertUniqueHealthDataPoints(
@@ -819,7 +819,8 @@ async function createLayout(
   const newRecord = await DBAdapter.getPrismaClient().layout.create({
     data: {
       userId,
-      layout: data.layout, // stored as JSON
+      widgets: data.widgets,
+      name: data.name
     } as Layout,
   });
   return newRecord as DBLayout;
@@ -832,7 +833,7 @@ async function createLayout(
 async function updateLayout(
   userId: number,
   layoutId: string,
-  layout: Layout
+  layoutData?: Layout
 ): Promise<DBLayout> {
   // First, check that the layout exists and belongs to the user.
   const existing = await DBAdapter.getPrismaClient().layout.findFirst({
@@ -841,10 +842,13 @@ async function updateLayout(
   if (!existing) {
     throw new Error("Layout not found or unauthorized");
   }
-
+  
   const updatedRecord = await DBAdapter.getPrismaClient().layout.update({
     where: { id: layoutId },
-    data: { layout },
+    data: { 
+      widgets: layoutData?.widgets,
+      name: layoutData?.name
+    },
   });
 
   return updatedRecord as DBLayout;

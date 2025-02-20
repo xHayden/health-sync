@@ -1,10 +1,11 @@
 import React from "react";
-import { DataTypes } from "@/types/WidgetDataEnums";
-import widgetRegistry from "@/lib/widgetRegistry";
+import widgetRegistry, {
+  WidgetMetaDataTypes,
+  WidgetValue,
+} from "@/lib/widgetRegistry";
 import { Widget } from "@/types/WidgetData";
 import { useWorkoutSummaries } from "@/hooks/useWorkoutSummaries";
 import { useSleepSummaries } from "@/hooks/useSleepSummaries";
-import { ActivityCalendarProps } from "./widgets/ActivityCalendar";
 import { DBDailyWorkoutSummary } from "@/types/HealthData";
 import { Session } from "next-auth";
 
@@ -15,19 +16,22 @@ interface WidgetDisplayProps {
 
 export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   // Look up the meta info and the actual component from the registry.
-  const widgetMeta = widgetRegistry[widget.type.value];
+  if (!widget.type || !widgetRegistry[widget.type as WidgetValue]) {
+    return <div>No widget type</div>;
+  }
+  const widgetMeta = widgetRegistry[widget.type as WidgetValue];
   const WidgetComponent = widgetMeta.component;
 
   // Determine if a required data type is missing.
   const needsWorkoutData =
-    widget.requiredData.includes(DataTypes.WorkoutSummaries) &&
-    widget.data[DataTypes.WorkoutSummaries] === null;
+    widgetMeta.requiredData.includes(WidgetMetaDataTypes.WorkoutSummaries) &&
+    (widget.data[WidgetMetaDataTypes.WorkoutSummaries] === null || widget.data[WidgetMetaDataTypes.WorkoutSummaries] === undefined);
   const needsSleepData =
-    widget.requiredData.includes(DataTypes.SleepSummaries) &&
-    widget.data[DataTypes.SleepSummaries] === null;
+    widgetMeta.requiredData.includes(WidgetMetaDataTypes.SleepSummaries) &&
+    (widget.data[WidgetMetaDataTypes.SleepSummaries] === null || widget.data[WidgetMetaDataTypes.SleepSummaries] === undefined);
   const needsActivityDaysLevelsData =
-    widget.requiredData.includes(DataTypes.ActivityDaysLevels) &&
-    widget.data[DataTypes.ActivityDaysLevels] === null;
+    widgetMeta.requiredData.includes(WidgetMetaDataTypes.ActivityDaysLevels) &&
+    (widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === null || widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === undefined);
 
   // Conditionally fetch missing data.
   const {
@@ -65,37 +69,38 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   // Overwrite any missing data with fetched data.
   if (needsWorkoutData && workoutData) {
     if (Array.isArray(workoutData)) {
-      dataProps[DataTypes.WorkoutSummaries] = workoutData;
+      dataProps[WidgetMetaDataTypes.WorkoutSummaries] = workoutData;
     } else {
       console.error("Workout data is not an array.");
     }
   }
   if (needsSleepData && sleepData) {
-    dataProps[DataTypes.SleepSummaries] = sleepData;
+    dataProps[WidgetMetaDataTypes.SleepSummaries] = sleepData;
   }
   if (needsActivityDaysLevelsData && workoutData) {
     const activityData = {
-      metGoalDays: workoutData.map(
-        (workout: DBDailyWorkoutSummary) => {
-          if (workout.date && workout.totalWorkoutTime > 60) {
-            return workout.date;
-          }
-          return null;
+      metGoalDays: workoutData.map((workout: DBDailyWorkoutSummary) => {
+        if (workout.date && workout.totalWorkoutTime > 60) {
+          return workout.date;
         }
-      ),
+        return null;
+      }),
       exercisedButFailedToMeetGoalDays: workoutData.map(
         (workout: DBDailyWorkoutSummary) => {
-          if (workout.date && workout.totalWorkoutTime <= 60 && workout.totalWorkoutTime > 0) {
+          if (
+            workout.date &&
+            workout.totalWorkoutTime <= 60 &&
+            workout.totalWorkoutTime > 0
+          ) {
             return workout.date;
           }
           return null;
         }
       ),
     };
-    // console.log(activityData);
-    dataProps[DataTypes.ActivityDaysLevels] = activityData;
+    dataProps[WidgetMetaDataTypes.ActivityDaysLevels] = activityData;
   }
 
   // Render the widget’s component with the merged data props.
-  return <WidgetComponent {...dataProps} />;
+  return <WidgetComponent {...dataProps} widgetType={widget.type} settings={widget.settings} />;
 }
