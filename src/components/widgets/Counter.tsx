@@ -8,11 +8,10 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Minus, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { WidgetSetting } from "@/lib/widgetRegistry";
 import { DBCounter, Counter as CounterType } from "@/types/HealthData";
 import { AdditionalHooks } from "../WidgetDisplay";
-import { count } from "console";
 
 export interface CounterProps {
   counters: DBCounter[];
@@ -25,30 +24,33 @@ const Counter: React.FC<CounterProps> = ({
   additionalHooks,
   settings,
 }) => {
-  const [selectedCounter, setSelectedCounter] = useState<DBCounter | undefined>(undefined);
+  const [selectedCounter, setSelectedCounter] = useState<DBCounter | undefined>(
+    undefined
+  );
   const dataSourceValue = settings.find((s) => s.key === "dataSource")?.value;
   const [needsDataSource, setNeedsDataSource] = useState(
     counters ? counters.length == 0 : true
   );
-  const updateCounter = additionalHooks.updateCounter;
+  const updateCounter = additionalHooks?.updateCounter;
 
   useEffect(() => {
     if (!dataSourceValue || !counters || counters.length == 0) {
       setNeedsDataSource(true);
+      return;
     }
-    setSelectedCounter(counters.find(c => c.id == dataSourceValue))
+    setSelectedCounter(counters.find((c) => c.id == dataSourceValue));
   }, [dataSourceValue, counters, selectedCounter]);
 
-  const handleIncrement = () => {
-    console.log(selectedCounter)
+  const handleIncrement = (n: number = 1) => {
+    console.log(selectedCounter);
     if (!selectedCounter) return;
-    const newValue = selectedCounter.value + 1;
+    const newValue = selectedCounter.value + n;
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });
   };
 
-  const handleDecrement = () => {
+  const handleDecrement = (n: number = 1) => {
     if (!selectedCounter) return;
-    const newValue = selectedCounter.value - 1;
+    const newValue = selectedCounter.value - n;
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });
   };
 
@@ -72,27 +74,62 @@ const Counter: React.FC<CounterProps> = ({
   }, [counters]);
 
   return (
-    <Card className="w-full mx-8">
+    <div className="w-full mx-8 bg-transparent">
       <CardHeader className="flex items-center text-xl">
         {cardName ?? "Counter"}
       </CardHeader>
       <CardContent className="flex items-center justify-between my-12">
         {!needsDataSource ? (
           <>
-            <Button
-              variant="outline"
-              onClick={handleDecrement}
-            >
-              <Minus size={32} />
-            </Button>
-            <span className="text-8xl font-semibold">{selectedCounter?.value}</span>
-            <Button
-              variant="outline"
-              size={"lg"}
-              onClick={handleIncrement}
-            >
-              <Plus size={32} />
-            </Button>
+                        <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleDecrement(1)}
+              >
+                -1
+              </Button>
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleDecrement(5)}
+              >
+                -5
+              </Button>
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleDecrement(10)}
+              >
+                -10
+              </Button>
+            </div>
+            <span className="text-8xl font-semibold">
+              {selectedCounter?.value}
+            </span>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleIncrement(1)}
+              >
+                +1
+              </Button>
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleIncrement(5)}
+              >
+                +5
+              </Button>
+              <Button
+                variant="outline"
+                size={"lg"}
+                onClick={() => handleIncrement(10)}
+              >
+                +10
+              </Button>
+            </div>
           </>
         ) : (
           <div className="flex flex-col justify-center items-center text-center w-full">
@@ -111,7 +148,7 @@ const Counter: React.FC<CounterProps> = ({
           Reset
         </Button>
       </CardFooter>
-    </Card>
+    </div>
   );
 };
 

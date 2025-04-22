@@ -9,21 +9,23 @@ datasource db {
 }
 
 model User {
-  id                    Int                   @id @default(autoincrement())
-  createdAt             DateTime              @default(now())
-  name                  String?
-  email                 String?               @unique
-  emailVerified         DateTime?
-  image                 String?
-  accounts              Account[]
-  sessions              Session[]
-  healthDataPoints      HealthDataPoint[]
-  workouts              Workout[]
-  dailyWorkoutSummaries DailyWorkoutSummary[]
-  dailySleepSummaries   DailySleepSummary[]
-  sleepSessions         SleepSession[]
-  layouts               Layout[]
-  counters              Counter[]
+  id                       Int                   @id @default(autoincrement())
+  createdAt                DateTime              @default(now())
+  name                     String?
+  email                    String?               @unique
+  emailVerified            DateTime?
+  image                    String?
+  accounts                 Account[]
+  sessions                 Session[]
+  healthDataPoints         HealthDataPoint[]
+  workouts                 Workout[]
+  dailyWorkoutSummaries    DailyWorkoutSummary[]
+  dailySleepSummaries      DailySleepSummary[]
+  sleepSessions            SleepSession[]
+  layouts                  Layout[]
+  counters                 Counter[]
+  sharedLayoutsWhereMember SharedLayout[]        @relation(name: "sharedUser")
+  sharedLayoutsWhereOwner  SharedLayout[]        @relation(name: "owner")
 }
 
 model Account {
@@ -142,13 +144,14 @@ model HealthDataPoint {
 }
 
 model Layout {
-  id        String   @id @default(uuid())
-  userId    Int
-  widgets   Json[]
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id])
+  id            String         @id @default(uuid())
+  userId        Int
+  widgets       Json[]
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  user          User           @relation(fields: [userId], references: [id])
+  sharedLayouts SharedLayout[]
 }
 
 model Counter {
@@ -157,4 +160,36 @@ model Counter {
   name   String
   value  Int
   user   User   @relation(fields: [userId], references: [id])
+}
+
+enum PermissionType {
+  READ
+  WRITE
+}
+
+model SharedLayout {
+  id           Int                     @id @default(autoincrement())
+  layout       Layout                  @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  layoutId     String
+  owner        User                    @relation(name: "owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId      Int
+  sharedUser   User                    @relation(name: "sharedUser", fields: [sharedUserId], references: [id], onDelete: Cascade)
+  sharedUserId Int
+  token        String                  @unique
+  expires      DateTime? // null for no expiration
+  dataScopes   SharedLayoutDataScope[]
+}
+
+model SharedLayoutDataScope {
+  id             Int              @id @default(autoincrement())
+  sharedLayout   SharedLayout     @relation(fields: [sharedLayoutId], references: [id], onDelete: Cascade)
+  sharedLayoutId Int
+  // e.g. "Counter", "Workout", "SleepSession", etc.
+  resourceType   String
+  // If you want to share *all* counters: resourceId = null
+  // If only specific counters: resourceId = the counter.id
+  resourceId     Int?
+  permissions    PermissionType[]
+
+  @@index([sharedLayoutId, resourceType, resourceId])
 }

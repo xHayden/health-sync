@@ -20,21 +20,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataSourceManagerDialog from "./DataSourceManagerDialog";
-import { useDataSource } from "@/hooks/useDataSource";
-import widgetRegistry, {
-  DropdownItem,
-  WidgetSetting,
-  WidgetValue,
-} from "@/lib/widgetRegistry";
+import { DropdownDataSource } from "./DropdownDataSource";
+import widgetRegistry from "@/lib/widgetRegistry";
 import { Widget } from "@/types/WidgetData";
 import WidgetDisplay from "./WidgetDisplay";
 import { Session } from "next-auth";
@@ -92,7 +82,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     setCurrentSize({ width, height });
   }, [width, height]);
 
-  const snappedTransform = React.useMemo(
+  const snappedTransform = useMemo(
     () =>
       transform
         ? {
@@ -102,7 +92,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
         : { x: 0, y: 0 },
     [transform, gridSize]
   );
-  const shellStyle: React.CSSProperties = React.useMemo(
+  const shellStyle: React.CSSProperties = useMemo(
     () => ({
       position: "absolute",
       left: x,
@@ -116,11 +106,11 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
   );
 
   /* Dropdown settings & values */
-  const dropdownSettings = React.useMemo(
+  const dropdownSettings = useMemo(
     () => widget.settings.filter((s) => s.type === "dropdown"),
     [widget.settings]
   );
-  const [dropdownValues, setDropdownValues] = useState<Record<string, string>>(
+  const [dropdownValues, setDropdownValues] = useState<Record<string, string>>(  
     () =>
       Object.fromEntries(
         dropdownSettings.map((s) => [
@@ -139,26 +129,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     });
   }, [dropdownSettings]);
 
-  /* Data source hooks at top-level */
-  const dataSourceHooks = dropdownSettings.map((setting) =>
-    useDataSource(setting.source!, user.id)
-  );
-
-  const dropdownOptions: Record<string, DropdownItem[]> = dropdownSettings.reduce(
-    (acc, setting, idx) => {
-      const hook = dataSourceHooks[idx];
-      acc[setting.key] = hook.items.map((i) => ({
-        key: i.id.toString(),
-        label: i.label,
-        value: i.label,
-        callback: () => {},
-        disabled: false,
-      }));
-      return acc;
-    },
-    {} as Record<string, DropdownItem[]>
-  );
-
+  /* Resize handle */
   const resizeHandle = useMemo(
     () => (
       <span
@@ -224,61 +195,31 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
         return {
           ...setting,
           value: dropdownValues[setting.key],
-        } as WidgetSetting;
+        } as typeof setting;
       }
       const el = document.getElementById(
         setting.key
       ) as HTMLInputElement | null;
-      if (!el) return setting as WidgetSetting;
+      if (!el) return setting;
       if (setting.type === "boolean") {
         const checked =
           el.getAttribute("aria-checked") === "true" || el.checked === true;
-        return { ...setting, value: checked } as WidgetSetting;
+        return { ...setting, value: checked };
       }
       if (setting.type === "number") {
-        return { ...setting, value: Number(el.value) } as WidgetSetting;
+        return { ...setting, value: Number(el.value) };
       }
-      return { ...setting, value: el.value } as WidgetSetting;
+      return { ...setting, value: el.value };
     });
     const { updateWidgetSettings, currentLayout, saveLayout } = useStore.getState();
+    // @ts-ignore
     updateWidgetSettings(widget.id, newSettings);
     if (currentLayout) saveLayout(currentLayout.id, user);
     setOpenSettings(false);
   }, [dropdownValues, widget, user]);
 
-  const renderDropdown = (setting: WidgetSetting, idx: number): ReactNode => {
-    const opts = dropdownOptions[setting.key];
-    const currentId = dropdownValues[setting.key];
-    if (!opts) return <Skeleton className="h-10 w-full" />;
-    return (
-      <div className="flex gap-2 items-center">
-        <Select
-          value={currentId}
-          onValueChange={(val) =>
-            setDropdownValues((prev) => ({ ...prev, [setting.key]: val }))
-          }
-        >
-          <SelectTrigger id={setting.key} className="flex-1">
-            <SelectValue placeholder="Select…" />
-          </SelectTrigger>
-          <SelectContent>
-            {opts.map((o) => (
-              <SelectItem key={o.key} value={o.key} className="truncate">
-                {o.value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setManageSource(setting.source!)}
-        >
-          Manage
-        </Button>
-      </div>
-    );
-  };
+  type WidgetRegistryKeys = keyof typeof widgetRegistry;
+  const meta = widgetRegistry[widget.type as WidgetRegistryKeys];
 
   if (editMode) {
     return (
@@ -342,11 +283,11 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
             <DialogHeader>
               <DialogTitle>Widget Settings</DialogTitle>
               <DialogDescription>
-                Configure {widgetRegistry[widget.type as WidgetValue].name}
+                Configure {meta.name}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {widget.settings.map((setting, idx) => (
+              {widget.settings.map((setting) => (
                 <div key={setting.key} className="flex flex-col space-y-1">
                   <Label htmlFor={setting.key} className="text-sm font-medium">
                     {setting.label}
@@ -405,7 +346,17 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
                     />
                   )}
 
-                  {setting.type === "dropdown" && renderDropdown(setting, idx)}
+                  {setting.type === "dropdown" && (
+                    <DropdownDataSource
+                      source={setting.source!}
+                      userId={user.id}
+                      value={dropdownValues[setting.key]}
+                      onChange={(val: any) =>
+                        setDropdownValues((prev) => ({ ...prev, [setting.key]: val }))
+                      }
+                      onManage={() => setManageSource(setting.source!)}
+                    />
+                  )}
 
                   {setting.description && (
                     <small className="text-xs text-muted-foreground">
