@@ -30,6 +30,7 @@ const WidgetSearchModal = () => {
 
   // Get the widget metadata for the selected key.
   const selectedWidgetMeta = selectedWidgetKey ? widgetRegistry[selectedWidgetKey] : null;
+  const selectedWidgetSettings = [...selectedWidgetMeta?.settings ?? []];
 
   return (
     <Dialog>
@@ -91,7 +92,7 @@ const WidgetSearchModal = () => {
                     {selectedWidgetMeta.name} Preview
                   </h3>
                   <div className="w-full h-full max-h-[50vh] overflow-y-auto">
-                    <selectedWidgetMeta.component {...selectedWidgetMeta.dummyData} />
+                    <selectedWidgetMeta.component {...selectedWidgetMeta.dummyData} settings={selectedWidgetSettings} />
                   </div>
                 </>
               ) : (

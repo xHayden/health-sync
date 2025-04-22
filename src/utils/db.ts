@@ -1,6 +1,8 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import {
+  Counter,
   DailyWorkoutSummary,
+  DBCounter,
   DBDailyWorkoutSummary,
   DBHealthDataPoint,
   DBSleepSession,
@@ -873,6 +875,82 @@ async function deleteLayout(
   });
 }
 
+/**
+ * Fetch all counters for a given user.
+ */
+async function getCounters(userId: number): Promise<DBCounter[]> {
+  return await DBAdapter.getPrismaClient().counter.findMany({
+    where: { userId },
+    orderBy: { name: "asc" },
+  });
+}
+
+/**
+ * Fetch a single counter by its ID (and ensure it belongs to the user).
+ */
+async function getCounterById(
+  userId: number,
+  counterId: number
+): Promise<DBCounter | null> {
+  return await DBAdapter.getPrismaClient().counter.findFirst({
+    where: { id: counterId, userId },
+  });
+}
+
+/**
+ * Create a new counter for the user.
+ */
+async function createCounter(
+  userId: number,
+  data: Counter
+): Promise<DBCounter> {
+  return await DBAdapter.getPrismaClient().counter.create({
+    data: { userId, name: data.name, value: data.value },
+  });
+}
+
+/**
+ * Update an existing counter’s name and/or value.
+ * Throws if the counter doesn’t exist or isn’t owned by the user.
+ */
+async function updateCounter(
+  userId: number,
+  counterId: number,
+  data: DBCounter
+): Promise<DBCounter> {
+  const existing = await DBAdapter.getPrismaClient().counter.findFirst({
+    where: { id: counterId, userId },
+  });
+  if (!existing) {
+    throw new Error("Counter not found or unauthorized");
+  }
+
+  return await DBAdapter.getPrismaClient().counter.update({
+    where: { id: counterId },
+    data,
+  });
+}
+
+/**
+ * Delete a counter.
+ * Throws if the counter doesn’t exist or isn’t owned by the user.
+ */
+async function deleteCounter(
+  userId: number,
+  counterId: number
+): Promise<void> {
+  const existing = await DBAdapter.getPrismaClient().counter.findFirst({
+    where: { id: counterId, userId },
+  });
+  if (!existing) {
+    throw new Error("Counter not found or unauthorized");
+  }
+
+  await DBAdapter.getPrismaClient().counter.delete({
+    where: { id: counterId },
+  });
+}
+
 export {
   insertHealthData,
   getAllDataForUser,
@@ -892,4 +970,9 @@ export {
   createLayout,
   updateLayout,
   deleteLayout,
+  getCounterById,
+  getCounters,
+  deleteCounter,
+  updateCounter,
+  createCounter
 };

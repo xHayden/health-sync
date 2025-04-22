@@ -23,6 +23,7 @@ model User {
   dailySleepSummaries   DailySleepSummary[]
   sleepSessions         SleepSession[]
   layouts               Layout[]
+  counters              Counter[]
 }
 
 model Account {
@@ -148,4 +149,12 @@ model Layout {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model Counter {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  name   String
+  value  Int
+  user   User   @relation(fields: [userId], references: [id])
 }

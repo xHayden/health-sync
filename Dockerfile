@@ -6,8 +6,8 @@ WORKDIR /app
 RUN apk add --no-cache openssl libssl3 bash
 
 # Install dependencies
-COPY package.json package-lock.json ./
-RUN npm install --production=false
+COPY package.json yarn.lock ./
+RUN yarn install --production=false --frozen-lockfile
 
 # Copy the app source code
 COPY . .
@@ -17,17 +17,17 @@ RUN npx prisma generate
 
 # Build the app for production
 FROM base AS builder
-RUN npm run build
+RUN yarn build
 
 # Development Stage
 FROM base AS dev
 ENV NODE_ENV=development
 EXPOSE 3000
-CMD ["npm", "run", "dev"]
+CMD ["yarn", "dev"]
 
 # Production Stage
 FROM base AS prod
 COPY --from=builder /app/.next ./.next
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["yarn", "start"]

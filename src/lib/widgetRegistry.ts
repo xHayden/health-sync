@@ -14,6 +14,7 @@ import React from "react";
 import WorkoutChart, { WorkoutChartProps } from "@/components/widgets/WorkoutChart";
 import { ActivityCalendar } from "@/components/widgets/ActivityCalendar";
 import { DBDailyWorkoutSummary } from "@/types/HealthData";
+import Counter, { CounterProps } from "@/components/widgets/Counter";
 
 /**
  * Enum listing the different types of meta data that widgets may require.
@@ -26,13 +27,14 @@ export enum WidgetMetaDataTypes {
   WorkoutSummaries = "workoutSummaries",
   SleepSummaries = "sleepSummaries",
   ActivityDaysLevels = "activityDaysLevels",
+  Counters = "counters"
 }
 
 // -------------------
 // Widget Settings Types
 // -------------------
 
-export type SettingType = "number" | "text" | "boolean" | "select" | "color";
+export type SettingType = "number" | "text" | "boolean" | "select" | "color" | "dropdown";
 
 /**
  * Base interface for a widget setting.
@@ -43,9 +45,10 @@ export interface WidgetSettingBase<T> {
   key: string;
   label: string;
   type: SettingType;
-  defaultValue: T;
+  defaultValue?: T;
   value?: T;
   description?: string;
+  source?: string; // for dropdowns
 }
 
 /**
@@ -97,7 +100,7 @@ export interface WidgetMeta<
  *
  * When adding a new widget, add its unique key to this type union.
  */
-export type WidgetValue = "workoutChart" | "activityCalendar";
+export type WidgetValue = "workoutChart" | "activityCalendar" | "counter";
 
 /**
  * The widgetRegistry maps widget keys to their corresponding metadata.
@@ -110,7 +113,6 @@ export type WidgetValue = "workoutChart" | "activityCalendar";
  * 5. List any required data keys in the requiredData array.
  */
 const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
-  // Existing widget: Workout Chart
   workoutChart: {
     name: "Workout Chart",
     description: "A chart showing the user's workout history.",
@@ -186,7 +188,6 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
     ],
     requiredData: [WidgetMetaDataTypes.WorkoutSummaries],
   },
-  // Existing widget: Activity Calendar
   activityCalendar: {
     name: "Activity Calendar",
     description: "A calendar showing the user's activity history.",
@@ -255,6 +256,32 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
     ],
     requiredData: [WidgetMetaDataTypes.WorkoutSummaries],
   },
+  counter: {
+    name: "Counter",
+    description: "A simple increment/decrement/reset counter.",
+    component: Counter,
+    dummyData: {
+    },
+    settings: [
+      {
+        key: "cardName",
+        label: "Counter Name",
+        type: "text",
+        defaultValue: "",
+        description: "Name for the counter.",
+      },
+      {
+        key: "dataSource",
+        type: "dropdown",
+        label: "Counter Data Source",
+        description: "Counter Data Source",
+        source: "counters"
+      }
+    ],
+    requiredData: [
+      WidgetMetaDataTypes.Counters // todo, store this separately from widget data to allow as datasource
+    ],
+  },
   // To add a new widget, follow the pattern below:
   // newWidgetKey: {
   //   name: "New Widget Name",
@@ -271,6 +298,19 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
   //   ],
   // },
 };
+
+export interface Dropdown {
+  key: string,
+  items: DropdownItem[],
+  disabled?: boolean,
+  selected?: string
+}
+
+export interface DropdownItem {
+  key: string,
+  value: string,
+  callback: any
+}
 
 export type WidgetRegistry = typeof widgetRegistry;
 export default widgetRegistry;

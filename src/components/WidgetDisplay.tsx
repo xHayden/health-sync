@@ -1,13 +1,19 @@
 import React from "react";
 import widgetRegistry, {
+  Dropdown,
+  DropdownItem,
   WidgetMetaDataTypes,
+  WidgetSetting,
   WidgetValue,
 } from "@/lib/widgetRegistry";
 import { Widget } from "@/types/WidgetData";
 import { useWorkoutSummaries } from "@/hooks/useWorkoutSummaries";
 import { useSleepSummaries } from "@/hooks/useSleepSummaries";
-import { DBDailyWorkoutSummary } from "@/types/HealthData";
+import { Counter, DBDailyWorkoutSummary } from "@/types/HealthData";
 import { Session } from "next-auth";
+import { useCounters } from "@/hooks/useCounters";
+import { getCounters } from "@/utils/db";
+import { UseMutationResult } from "@tanstack/react-query";
 
 interface WidgetDisplayProps {
   widget: Widget;
@@ -32,6 +38,9 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   const needsActivityDaysLevelsData =
     widgetMeta.requiredData.includes(WidgetMetaDataTypes.ActivityDaysLevels) &&
     (widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === null || widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === undefined);
+  const needsCounterData =
+    widgetMeta.requiredData.includes(WidgetMetaDataTypes.Counters) &&
+    (widget.data[WidgetMetaDataTypes.Counters] === null || widget.data[WidgetMetaDataTypes.Counters] === undefined);
 
   // Conditionally fetch missing data.
   const {
@@ -49,15 +58,23 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     error: sleepError,
   } = useSleepSummaries(user.id, needsSleepData);
 
+  const {
+    data: counterData,
+    isLoading: isLoadingCounters,
+    error: counterError,
+    updateCounter
+  } = useCounters(user.id, needsCounterData);
+
   // Optionally handle errors.
-  if (workoutError || sleepError) {
+  if (workoutError || sleepError || counterError) {
     return <div>Error loading widget data.</div>;
   }
 
   // While any required data is loading, show a loading indicator.
   if (
     (needsWorkoutData && isLoadingWorkout) ||
-    (needsSleepData && isLoadingSleep)
+    (needsSleepData && isLoadingSleep) ||
+    (needsCounterData && isLoadingCounters)
   ) {
     return <div>Loading...</div>;
   }
@@ -76,6 +93,9 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   }
   if (needsSleepData && sleepData) {
     dataProps[WidgetMetaDataTypes.SleepSummaries] = sleepData;
+  }
+  if (needsCounterData && counterData) {
+    dataProps[WidgetMetaDataTypes.Counters] = counterData;
   }
   if (needsActivityDaysLevelsData && workoutData) {
     const activityData = {
@@ -101,6 +121,13 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     dataProps[WidgetMetaDataTypes.ActivityDaysLevels] = activityData;
   }
 
-  // Render the widget’s component with the merged data props.
-  return <WidgetComponent {...dataProps} widgetType={widget.type} settings={widget.settings} />;
+  const additionalHooks: AdditionalHooks = {
+    updateCounter
+  }
+
+  return <WidgetComponent widgetMeta={widgetMeta} widgetId={widget.id} widgetType={widget.type} {...dataProps} settings={widget.settings} additionalHooks={additionalHooks} />;
+}
+
+export interface AdditionalHooks {
+  updateCounter: UseMutationResult<Counter, Error, { id: number; } & Partial<Omit<Counter, "id">>, unknown>;
 }

@@ -69,6 +69,11 @@ export interface DailyWorkoutSummary {
   ctl?: number;
 }
 
+export interface Counter {
+  name: string;
+  value: number;
+}
+
 export interface DailySleepSummary {
   date: string;
   totalSleepSeconds: number;
@@ -102,6 +107,10 @@ export interface HealthKitWorkout
   extends Omit<Workout, "timestamp" | "endTimestam"> {
   startDate: string;
   endDate?: string;
+}
+
+export interface DBCounter extends Omit<Counter, "">, DBBase {
+
 }
 
 export interface DBDailyWorkoutSummary
