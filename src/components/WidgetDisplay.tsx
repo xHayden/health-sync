@@ -8,8 +8,8 @@ import { useWorkoutSummaries } from "@/hooks/useWorkoutSummaries";
 import { useSleepSummaries } from "@/hooks/useSleepSummaries";
 import { useCounters } from "@/hooks/useCounters";
 import { Session } from "next-auth";
-import { Counter, DBDailyWorkoutSummary } from "@/types/HealthData";
 import { UseMutationResult } from "@tanstack/react-query";
+import { Counter, DailyWorkoutSummary } from "@prisma/client";
 
 interface WidgetDisplayProps {
   widget: Widget;
@@ -83,12 +83,12 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   if (needsActivityDaysLevelsData && workoutData) {
     dataProps[WidgetMetaDataTypes.ActivityDaysLevels] = {
       metGoalDays: workoutData
-        .map((w: DBDailyWorkoutSummary) =>
+        .map((w: DailyWorkoutSummary) =>
           w.totalWorkoutTime > 60 ? w.date : null
         )
         .filter(Boolean),
       exercisedButFailedToMeetGoalDays: workoutData
-        .map((w: DBDailyWorkoutSummary) =>
+        .map((w: DailyWorkoutSummary) =>
           w.totalWorkoutTime > 0 && w.totalWorkoutTime <= 60 ? w.date : null
         )
         .filter(Boolean),

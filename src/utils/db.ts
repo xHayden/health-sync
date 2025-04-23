@@ -1,26 +1,16 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import {
-  Counter,
-  DailyWorkoutSummary,
-  DBCounter,
-  DBDailyWorkoutSummary,
-  DBHealthDataPoint,
-  DBSleepSession,
-  DBWorkout,
-  HealthDataPoint,
-  HealthKitWorkout,
-  HistoricalHealthData,
-  PrismaDailyWorkoutSummaryInput,
-  PrismaHealthDataPointInput,
-  PrismaHealthDataPointWhereUniqueInput,
-  SleepSession,
-  Workout,
-} from "@/types/HealthData";
+import { Counter, Prisma, PrismaClient } from "@prisma/client";
+import { HealthKitWorkout, HistoricalHealthData } from "@/types/HealthData";
 import { calculateAndStoreWorkoutSummaries } from "./fitnessCalc";
-import { Layout, DBLayout } from "@/types/WidgetData";
 import prisma from "../lib/prisma";
-import { Layout as PrismaLayout } from "@prisma/client";
-import { InputJsonValue } from "@prisma/client/runtime/library";
+import {
+  User,
+  HealthDataPoint,
+  Workout,
+  SleepSession,
+  DailySleepSummary,
+  DailyWorkoutSummary,
+} from "@prisma/client";
+import { TypedLayout, Widget } from "@/types/WidgetData";
 
 export class DBAdapter {
   private constructor() {}
@@ -48,7 +38,7 @@ async function getUserIdOrCreate(email: string): Promise<number> {
 }
 
 function validateHealthDataPoint(
-  point: HealthDataPoint | DBHealthDataPoint | PrismaHealthDataPointInput
+  point: HealthDataPoint | Prisma.HealthDataPointCreateInput
 ): boolean {
   return (
     typeof point.timestamp === "string" &&
@@ -60,7 +50,7 @@ function validateHealthDataPoint(
 async function insertUniqueHealthDataPoints(
   userId: number,
   category: string,
-  dataPoints: PrismaHealthDataPointInput[] | undefined
+  dataPoints: Prisma.HealthDataPointCreateInput[] | undefined
 ): Promise<void> {
   if (!dataPoints || dataPoints.length === 0) return;
 
@@ -150,13 +140,13 @@ async function insertWorkouts(
       );
     }
 
-    // try {
-    //   await calculateAndStoreWorkoutSummaries(userId);
-    // } catch (e) {
-    //   console.error(
-    //     `Error calculating fitness metrics: ${(e as Error).message}`
-    //   );
-    // }
+    try {
+      await calculateAndStoreWorkoutSummaries(userId);
+    } catch (e) {
+      console.error(
+        `Error calculating fitness metrics: ${(e as Error).message}`
+      );
+    }
   }
 }
 
@@ -178,68 +168,69 @@ async function insertWorkoutSummaries(
 
   // Helper to build proper HealthDataPointWhereUniqueInput
   function toHDPWhereUnique(
-    obj: { id?: number } & Partial<{
-      timestamp: Date;
-      category: string;
-      userId: number;
-    }>
+    obj: Prisma.HealthDataPointWhereUniqueInput
   ): Prisma.HealthDataPointWhereUniqueInput {
-    if (obj.id !== undefined) {
+    if ("id" in obj && obj.id !== undefined) {
       return { id: obj.id };
     }
     return {
-        userId_timestamp_category: {
-          userId: obj.userId!,
-          timestamp: obj.timestamp!,
-          category: obj.category!,
-        }
+      userId_timestamp_category: obj.userId_timestamp_category!,
     };
   }
 
-  // try {
-  //   const createdSummaries = await Promise.all(
-  //     workoutSummaries.map((summary) => {
-  //       const data: PrismaDailyWorkoutSummaryInput = {
-  //         date: summary.date,
-  //         totalWorkoutTime: summary.totalWorkoutTime,
-  //         energyBurned: summary.energyBurned,
-  //         totalDistance: summary.totalDistance,
-  //         steps: summary.steps,
-  //         tts: summary.tts,
-  //         atl: summary.atl,
-  //         ctl: summary.ctl,
-  //         bodyweight: summary.bodyweight,
-  //         exerciseTypes: summary.exerciseTypes,
-  //         user: {
-  //           connect: { id: userId },
-  //         },
-  //         workouts: summary.workouts,
-  //         healthDataPointMetrics: {
-  //           connect:
-  //             summary.healthDataPointMetrics?.connect?.map(toHDPWhereUnique),
-  //           create: summary.healthDataPointMetrics?.create ?? [],
-  //         },
-  //       };
-  //       if (!data.user?.connect?.id) {
-  //         throw new Error("Invalid data: userId is required to connect user.");
-  //       }        
+  try {
+    const createdSummaries = await Promise.all(
+      workoutSummaries.map((summary) => {
+        let toConnect = summary.healthDataPointMetrics?.connect;
+        if (Array.isArray(toConnect)) {
+          toConnect = toConnect.map(toHDPWhereUnique);
+        } else {
+          if (!toConnect)
+            throw Error(
+              "Invalid connection for workout summary healthDataPointMetrics"
+            );
+          toConnect = toHDPWhereUnique(toConnect);
+        }
+        const data: Prisma.DailyWorkoutSummaryCreateInput = {
+          date: summary.date,
+          totalWorkoutTime: summary.totalWorkoutTime,
+          energyBurned: summary.energyBurned,
+          totalDistance: summary.totalDistance,
+          steps: summary.steps,
+          tts: summary.tts,
+          atl: summary.atl,
+          ctl: summary.ctl,
+          bodyweight: summary.bodyweight,
+          exerciseTypes: summary.exerciseTypes,
+          user: {
+            connect: { id: userId },
+          },
+          workouts: summary.workouts,
+          healthDataPointMetrics: {
+            connect: toConnect,
+            create: summary.healthDataPointMetrics?.create ?? [],
+          },
+        };
+        if (!data.user?.connect?.id) {
+          throw new Error("Invalid data: userId is required to connect user.");
+        }
 
-  //       return prismaClient.dailyWorkoutSummary.create({ data });
-  //     })
-  //   );
+        return prismaClient.dailyWorkoutSummary.create({ data });
+      })
+    );
 
-  //   console.log(
-  //     `Inserted ${createdSummaries.length} workout summaries for user ${userId}`
-  //   );
+    console.log(
+      `Inserted ${createdSummaries.length} workout summaries for user ${userId}`
+    );
 
-  //   return createdSummaries;
-  // } catch (error) {
-  //   console.error(
-  //     `Error inserting workout summaries: ${(error as Error).message}`
-  //   );
-  //   throw error;
-  // }
-  return []; // fix later
+    return createdSummaries;
+  } catch (error) {
+    console.error(
+      `Error inserting workout summaries: ${(error as Error).message}`
+    );
+    throw error;
+  }
+  return [];
 }
 
 /**
@@ -255,9 +246,29 @@ function isConnectById(
  * Type guard to check if a HealthDataPointMetric is of type { timestamp: string; category: string; userId: number }
  */
 function isConnectByFields(
-  item: { id: number } | { timestamp: Date; category: string; userId: number }
+  item:
+    | { id: number }
+    | {
+        timestamp:
+          | string
+          | Date
+          | Prisma.DateTimeFilter<"HealthDataPoint">
+          | undefined;
+        category: string;
+        userId: number;
+      }
 ): item is { timestamp: Date; category: string; userId: number } {
-  return "timestamp" in item && "category" in item && "userId" in item;
+  if ("timestamp" in item && typeof item.timestamp === "string") {
+    item.timestamp = new Date(item.timestamp);
+  }
+  return (
+    "timestamp" in item &&
+    item.timestamp instanceof Date &&
+    "category" in item &&
+    typeof item.category === "string" &&
+    "userId" in item &&
+    typeof item.userId === "number"
+  );
 }
 
 /**
@@ -267,7 +278,7 @@ function isConnectByFields(
  */
 async function insertWorkoutSummariesBulk(
   userId: number,
-  workoutSummaries: PrismaDailyWorkoutSummaryInput[]
+  workoutSummaries: Prisma.DailyWorkoutSummaryCreateInput[]
 ): Promise<void> {
   if (!workoutSummaries || workoutSummaries.length === 0) {
     console.log("No workout summaries to insert or update.");
@@ -277,246 +288,235 @@ async function insertWorkoutSummariesBulk(
   const prisma: PrismaClient = DBAdapter.getPrismaClient();
   const updateBatchSize = 50;
 
-  // fix later
-  return;
-
   // STEP 1: Upsert Daily Workout Summaries in Batches
   // Break the large array into chunks
-  // for (let i = 0; i < workoutSummaries.length; i += updateBatchSize) {
-  //   const batch = workoutSummaries.slice(i, i + updateBatchSize);
-  //   await prisma.$transaction(
-  //     async (tx: any) => {
-  //       for (const summary of batch) {
-  //         await tx.dailyWorkoutSummary.upsert({
-  //           where: {
-  //             userId_date: {
-  //               userId,
-  //               date: new Date(summary.date),
-  //             },
-  //           },
-  //           create: {
-  //             userId,
-  //             date: summary.date,
-  //             totalWorkoutTime: summary.totalWorkoutTime,
-  //             energyBurned: summary.energyBurned,
-  //             totalDistance: summary.totalDistance,
-  //             steps: summary.steps,
-  //             tts: summary.tts,
-  //             atl: summary.atl,
-  //             ctl: summary.ctl,
-  //             bodyweight: summary.bodyweight,
-  //             exerciseTypes: summary.exerciseTypes,
-  //           },
-  //           update: {
-  //             totalWorkoutTime: summary.totalWorkoutTime,
-  //             energyBurned: summary.energyBurned,
-  //             totalDistance: summary.totalDistance,
-  //             steps: summary.steps,
-  //             tts: summary.tts,
-  //             atl: summary.atl,
-  //             ctl: summary.ctl,
-  //             bodyweight: summary.bodyweight,
-  //             exerciseTypes: summary.exerciseTypes,
-  //           },
-  //         });
-  //       }
-  //     },
-  //     {
-  //       maxWait: 20000, // Increase if needed
-  //       timeout: 15000, // Increase if needed
-  //     }
-  //   );
-  //   console.log(`Upserted batch ${i / updateBatchSize + 1} of summaries`);
-  // }
+  for (let i = 0; i < workoutSummaries.length; i += updateBatchSize) {
+    const batch = workoutSummaries.slice(i, i + updateBatchSize);
+    await prisma.$transaction(
+      async (tx: any) => {
+        for (const summary of batch) {
+          await tx.dailyWorkoutSummary.upsert({
+            where: {
+              userId_date: {
+                userId,
+                date: new Date(summary.date),
+              },
+            },
+            create: {
+              userId,
+              date: summary.date,
+              totalWorkoutTime: summary.totalWorkoutTime,
+              energyBurned: summary.energyBurned,
+              totalDistance: summary.totalDistance,
+              steps: summary.steps,
+              tts: summary.tts,
+              atl: summary.atl,
+              ctl: summary.ctl,
+              bodyweight: summary.bodyweight,
+              exerciseTypes: summary.exerciseTypes,
+            },
+            update: {
+              totalWorkoutTime: summary.totalWorkoutTime,
+              energyBurned: summary.energyBurned,
+              totalDistance: summary.totalDistance,
+              steps: summary.steps,
+              tts: summary.tts,
+              atl: summary.atl,
+              ctl: summary.ctl,
+              bodyweight: summary.bodyweight,
+              exerciseTypes: summary.exerciseTypes,
+            },
+          });
+        }
+      },
+      {
+        maxWait: 20000, // Increase if needed
+        timeout: 15000, // Increase if needed
+      }
+    );
+    console.log(`Upserted batch ${i / updateBatchSize + 1} of summaries`);
+  }
 
-  // console.log(
-  //   `Upserted ${workoutSummaries.length} workout summaries for user ${userId}.`
-  // );
+  console.log(
+    `Upserted ${workoutSummaries.length} workout summaries for user ${userId}.`
+  );
 
-  // // STEP 2: Fetch all inserted/updated summaries to get their IDs
-  // const insertedSummaries = await prisma.dailyWorkoutSummary.findMany({
-  //   where: {
-  //     userId,
-  //     date: {
-  //       in: workoutSummaries.map((s) => new Date(s.date)),
-  //     },
-  //   },
-  //   select: {
-  //     id: true,
-  //     date: true,
-  //   },
-  // });
+  // STEP 2: Fetch all inserted/updated summaries to get their IDs
+  const insertedSummaries = await prisma.dailyWorkoutSummary.findMany({
+    where: {
+      userId,
+      date: {
+        in: workoutSummaries.map((s) => new Date(s.date)),
+      },
+    },
+    select: {
+      id: true,
+      date: true,
+    },
+  });
 
-  // const summaryMap = new Map<string, number>();
-  // insertedSummaries.forEach((summary: DBDailyWorkoutSummary) => {
-  //   const dateKey = summary.date.toISOString().split("T")[0];
-  //   summaryMap.set(dateKey, summary.id);
-  // });
+  const summaryMap = new Map<string, number>();
+  insertedSummaries.forEach((summary) => {
+    const dateKey = summary.date.toISOString().split("T")[0];
+    summaryMap.set(dateKey, summary.id);
+  });
 
-  // // STEP 3: Connect Workouts to Summaries
-  // const workoutConnections: { workoutId: number; summaryId: number }[] = [];
-  // workoutSummaries.forEach((summary: PrismaDailyWorkoutSummaryInput) => {
-  //   const dateKey = summary.date.split("T")[0];
-  //   const summaryId = summaryMap.get(dateKey);
-  //   if (summaryId && summary.workouts && summary.workouts.connect) {
-  //     summary.workouts.connect.forEach((workout) => {
-  //       workoutConnections.push({
-  //         workoutId: workout.id,
-  //         summaryId,
-  //       });
-  //     });
-  //   }
-  // });
+  // STEP 3: Connect Workouts to Summaries
+  const workoutConnections: { workoutId: number; summaryId: number }[] = [];
 
-  // for (let i = 0; i < workoutConnections.length; i += updateBatchSize) {
-  //   const batch = workoutConnections.slice(i, i + updateBatchSize);
-  //   await prisma.$transaction(
-  //     async (tx: any) => {
-  //       const updatePromises = batch.map((conn) =>
-  //         tx.workout.update({
-  //           where: { id: conn.workoutId },
-  //           data: { dailyWorkoutSummaryId: conn.summaryId },
-  //         })
-  //       );
-  //       await Promise.all(updatePromises);
-  //     },
-  //     {
-  //       maxWait: 20000,
-  //       timeout: 15000,
-  //     }
-  //   );
-  //   console.log(
-  //     `Connected batch ${
-  //       Math.floor(i / updateBatchSize) + 1
-  //     } of workouts to summaries.`
-  //   );
-  // }
+  workoutSummaries.forEach((summary) => {
+    let key;
+    if (summary.date instanceof Date) {
+      key = summary.date.toISOString().split("T")[0];
+    } else {
+      key = summary.date.split("T")[0];
+    }
+    const summaryId = summaryMap.get(key);
+    const connects = Array.isArray(summary.workouts?.connect)
+      ? summary.workouts.connect
+      : summary.workouts?.connect
+      ? [summary.workouts.connect]
+      : [];
 
-  // console.log(
-  //   `Successfully connected ${workoutConnections.length} workouts to their respective summaries.`
-  // );
+    connects.forEach((w) => {
+      if ("id" in w && typeof w.id === "number") {
+        if (summaryId) workoutConnections.push({ workoutId: w.id, summaryId });
+      }
+    });
+  });
 
-  // // STEP 4: Handle HealthDataPointMetrics (existing and new)
-  // const existingMetricsConnectByFields: {
-  //   timestamp: Date;
-  //   category: string;
-  //   userId: number;
-  // }[] = [];
-  // const newMetricsCreate: HealthDataPoint[] = [];
+  for (let i = 0; i < workoutConnections.length; i += updateBatchSize) {
+    const batch = workoutConnections.slice(i, i + updateBatchSize);
+    await prisma.$transaction(
+      async (tx: any) => {
+        const updatePromises = batch.map((conn) =>
+          tx.workout.update({
+            where: { id: conn.workoutId },
+            data: { dailyWorkoutSummaryId: conn.summaryId },
+          })
+        );
+        await Promise.all(updatePromises);
+      },
+      {
+        maxWait: 20000,
+        timeout: 15000,
+      }
+    );
+    console.log(
+      `Connected batch ${
+        Math.floor(i / updateBatchSize) + 1
+      } of workouts to summaries.`
+    );
+  }
 
-  // workoutSummaries.forEach((summary: PrismaDailyWorkoutSummaryInput) => {
-  //   const dateKey = summary.date.split("T")[0];
-  //   const summaryId = summaryMap.get(dateKey);
+  console.log(
+    `Successfully connected ${workoutConnections.length} workouts to their respective summaries.`
+  );
 
-  //   if (summaryId && summary.healthDataPointMetrics) {
-  //     if (Array.isArray(summary.healthDataPointMetrics.connect)) {
-  //       summary.healthDataPointMetrics.connect.forEach((metric) => {
-  //         if (isConnectByFields(metric)) {
-  //           existingMetricsConnectByFields.push({
-  //             timestamp: metric.timestamp,
-  //             category: metric.category,
-  //             userId: metric.userId,
-  //           });
-  //         } else {
-  //           console.warn(
-  //             `Skipped connecting HealthDataPoint with an unsupported method.`
-  //           );
-  //         }
-  //       });
-  //     }
+  // STEP 4: Handle HealthDataPointMetrics (existing and new)
+  const existingMetricsConnectByFields: Prisma.HealthDataPointWhereUniqueInput[] =
+    [];
+  const newMetricsCreate: Prisma.HealthDataPointCreateInput[] = [];
 
-  //     if (Array.isArray(summary.healthDataPointMetrics.create)) {
-  //       summary.healthDataPointMetrics.create.forEach((metric) => {
-  //         newMetricsCreate.push(metric);
-  //       });
-  //     }
-  //   }
-  // });
+  workoutSummaries.forEach((summary) => {
+    const dateKey = new Date(summary.date).toISOString().split("T")[0];
+    const summaryId = summaryMap.get(dateKey);
 
-  // // Connect existing HealthDataPoints by fields in batches
-  // for (
-  //   let i = 0;
-  //   i < existingMetricsConnectByFields.length;
-  //   i += updateBatchSize
-  // ) {
-  //   const batch = existingMetricsConnectByFields.slice(i, i + updateBatchSize);
-  //   await prisma.$transaction(
-  //     async (tx: any) => {
-  //       const updatePromises = batch.map((metric) =>
-  //         tx.healthDataPoint.updateMany({
-  //           where: {
-  //             userId: metric.userId,
-  //             timestamp: metric.timestamp,
-  //             category: metric.category,
-  //           },
-  //           data: {
-  //             dailyWorkoutSummaryId: summaryMap.get(
-  //               metric.timestamp.toISOString().split("T")[0]
-  //             ),
-  //           },
-  //         })
-  //       );
-  //       await Promise.all(updatePromises);
-  //     },
-  //     {
-  //       maxWait: 20000,
-  //       timeout: 15000,
-  //     }
-  //   );
-  //   console.log(
-  //     `Connected batch ${
-  //       Math.floor(i / updateBatchSize) + 1
-  //     } of existing health data metrics by fields.`
-  //   );
-  // }
+    if (summaryId && summary.healthDataPointMetrics) {
+      const connectInputs = summary.healthDataPointMetrics.connect ?? [];
+      const createInputs = summary.healthDataPointMetrics.create ?? [];
 
-  // console.log(
-  //   `Successfully connected ${existingMetricsConnectByFields.length} existing health data metrics.`
-  // );
+      // Normalize and push connect inputs
+      (Array.isArray(connectInputs) ? connectInputs : [connectInputs]).forEach(
+        (metric) => {
+          existingMetricsConnectByFields.push(metric);
+        }
+      );
 
-  // // Create new HealthDataPointMetrics in batches
-  // if (newMetricsCreate.length > 0) {
-  //   const metricsData = newMetricsCreate.map((metric: HealthDataPoint) => {
-  //     const dateKey = metric.timestamp.split("T")[0];
-  //     const summaryId = summaryMap.get(dateKey);
-  //     return {
-  //       userId,
-  //       dailyWorkoutSummaryId: summaryId,
-  //       timestamp: metric.timestamp,
-  //       value: metric.value,
-  //       category: metric.category,
-  //     };
-  //   });
+      // Normalize and push create inputs
+      (Array.isArray(createInputs) ? createInputs : [createInputs]).forEach(
+        (metric) => {
+          newMetricsCreate.push(metric);
+        }
+      );
+    }
+  });
 
-  //   for (let i = 0; i < metricsData.length; i += updateBatchSize) {
-  //     const batch = metricsData.slice(i, i + updateBatchSize);
-  //     await prisma.$transaction(
-  //       async (tx: any) => {
-  //         await tx.healthDataPoint.createMany({
-  //           data: batch,
-  //           skipDuplicates: true,
-  //         });
-  //       },
-  //       {
-  //         maxWait: 20000,
-  //         timeout: 15000,
-  //       }
-  //     );
-  //     console.log(
-  //       `Created batch ${
-  //         Math.floor(i / updateBatchSize) + 1
-  //       } of new health data metrics.`
-  //     );
-  //   }
+  // Connect existing HealthDataPoints by fields in batches
+  await prisma.$transaction(
+    async (tx) => {
+      const updatePromises = existingMetricsConnectByFields.map((metric) => {
+        // 1) force timestamp into a JS Date
+        const ts = new Date((metric as any).timestamp);
+        // 2) build your YYYY-MM-DD key
+        const dateKey = ts.toISOString().split("T")[0];
+        // 3) fire off the update
+        return tx.healthDataPoint.updateMany({
+          where: {
+            userId: metric.userId,
+            category: metric.category,
+            timestamp: ts,
+          },
+          data: {
+            dailyWorkoutSummaryId: summaryMap.get(dateKey) ?? undefined,
+          },
+        });
+      });
+  
+      await Promise.all(updatePromises);
+    },
+    { maxWait: 20000, timeout: 15000 }
+  );
 
-  //   console.log(
-  //     `Successfully created ${newMetricsCreate.length} new health data metrics.`
-  //   );
-  // }
+  console.log(
+    `Successfully connected ${existingMetricsConnectByFields.length} existing health data metrics.`
+  );
 
-  // console.log(
-  //   `Bulk upsertion and linking of workout summaries completed successfully for user ${userId}.`
-  // );
+  // Create new HealthDataPointMetrics in batches
+  if (newMetricsCreate.length > 0) {
+    const metricsData = newMetricsCreate.map(
+      (metric: Prisma.HealthDataPointCreateInput) => {
+        const dateKey = new Date(metric.timestamp).toISOString().split("T")[0];
+        const summaryId = summaryMap.get(dateKey);
+        return {
+          userId,
+          dailyWorkoutSummaryId: summaryId,
+          timestamp: metric.timestamp,
+          value: metric.value,
+          category: metric.category,
+        };
+      }
+    );
+
+    for (let i = 0; i < metricsData.length; i += updateBatchSize) {
+      const batch = metricsData.slice(i, i + updateBatchSize);
+      await prisma.$transaction(
+        async (tx: any) => {
+          await tx.healthDataPoint.createMany({
+            data: batch,
+            skipDuplicates: true,
+          });
+        },
+        {
+          maxWait: 20000,
+          timeout: 15000,
+        }
+      );
+      console.log(
+        `Created batch ${
+          Math.floor(i / updateBatchSize) + 1
+        } of new health data metrics.`
+      );
+    }
+
+    console.log(
+      `Successfully created ${newMetricsCreate.length} new health data metrics.`
+    );
+  }
+
+  console.log(
+    `Bulk upsertion and linking of workout summaries completed successfully for user ${userId}.`
+  );
 }
 
 async function insertSleepSummaries(userId: number): Promise<SleepSession[]> {
@@ -643,7 +643,7 @@ async function insertHealthData(data: HistoricalHealthData): Promise<void> {
       data.mindfulSession
     );
     await insertWorkouts(userId, data.workouts);
-    await insertSleepSessions(userId, data.sleepData);
+    // await insertSleepSessions(userId, data.sleepData);
     console.log(`New health data documents inserted for user: ${userId}`);
   } catch (e) {
     console.error((e as Error).message);
@@ -652,7 +652,6 @@ async function insertHealthData(data: HistoricalHealthData): Promise<void> {
 }
 
 async function getAllDataForUser(userId: number): Promise<any> {
-  return []; // fix later
   const dataPoints = await DBAdapter.getPrismaClient().healthDataPoint.findMany(
     {
       where: { userId },
@@ -691,25 +690,23 @@ async function getDataForUserByDate(
   const start = new Date(date);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-  return; // fix later
+  const dataPoints: HealthDataPoint[] =
+    await DBAdapter.getPrismaClient().healthDataPoint.findMany({
+      where: {
+        userId,
+        timestamp: { gte: start, lt: end },
+      },
+      orderBy: { timestamp: "asc" },
+    });
 
-  // const dataPoints: DBHealthDataPoint[] =
-  //   await DBAdapter.getPrismaClient().healthDataPoint.findMany({
-  //     where: {
-  //       userId,
-  //       timestamp: { gte: start, lt: end },
-  //     },
-  //     orderBy: { timestamp: "asc" },
-  //   });
-
-  // const results: { [key: string]: any[] } = {};
-  // for (const dp of dataPoints) {
-  //   if (!results[dp.category]) {
-  //     results[dp.category] = [];
-  //   }
-  //   results[dp.category].push(dp);
-  // }
-  // return results;
+  const results: { [key: string]: any[] } = {};
+  for (const dp of dataPoints) {
+    if (!results[dp.category]) {
+      results[dp.category] = [];
+    }
+    results[dp.category].push(dp);
+  }
+  return results;
 }
 
 /**
@@ -717,7 +714,7 @@ async function getDataForUserByDate(
  * @param userId - The ID of the user.
  * @returns An array of workouts with heart rate samples.
  */
-async function getWorkouts(userId: number): Promise<DBWorkout[]> {
+async function getWorkouts(userId: number): Promise<Workout[]> {
   const workouts = await DBAdapter.getPrismaClient().workout.findMany({
     where: { userId },
     include: {
@@ -728,46 +725,28 @@ async function getWorkouts(userId: number): Promise<DBWorkout[]> {
     },
     orderBy: { timestamp: "asc" },
   });
-
-  return []; // fix later
-
-  // return workouts.map((workout: DBWorkout) => ({
-  //   id: workout.id,
-  //   timestamp: workout.timestamp,
-  //   endTimestamp: workout.endTimestamp,
-  //   workoutType: workout.workoutType,
-  //   duration: workout.duration,
-  //   energyBurned: workout.energyBurned,
-  //   distance: workout.distance,
-  //   heartRateSamples: workout.heartRateSamples.map(
-  //     (sample: DBHealthDataPoint) => ({
-  //       timestamp: sample.timestamp,
-  //       value: sample.value,
-  //     })
-  //   ),
-  // }));
+  return workouts;
 }
 
 async function getWorkoutSummaries(
   userId: number
-): Promise<DBDailyWorkoutSummary[]> {
+): Promise<DailyWorkoutSummary[]> {
   const prisma = DBAdapter.getPrismaClient();
-  return []; // fix later
-  // return prisma.dailyWorkoutSummary.findMany({
-  //   where: {
-  //     userId,
-  //   },
-  //   orderBy: {
-  //     date: "asc",
-  //   },
-  //   include: {
-  //     workouts: false,
-  //     healthDataPointMetrics: false,
-  //   },
-  // });
+  return prisma.dailyWorkoutSummary.findMany({
+    where: {
+      userId,
+    },
+    orderBy: {
+      date: "asc",
+    },
+    include: {
+      workouts: false,
+      healthDataPointMetrics: false,
+    },
+  });
 }
 
-async function getSleepSessions(userId: number): Promise<DBSleepSession[]> {
+async function getSleepSessions(userId: number): Promise<SleepSession[]> {
   return [];
 }
 
@@ -832,20 +811,14 @@ async function getMaxHeartRate(
 
 async function getRestingHeartRates(
   userId: number
-): Promise<DBHealthDataPoint[]> {
-  const results = await DBAdapter.getPrismaClient().healthDataPoint.findMany({
+): Promise<HealthDataPoint[]> {
+  return await DBAdapter.getPrismaClient().healthDataPoint.findMany({
     where: {
       userId,
       category: "resting_heart_rate",
     },
     orderBy: { timestamp: "desc" },
   });
-
-  // return results.map((r: HealthDataPoint) => ({
-  //   timestamp: r.timestamp,
-  //   value: r.value,
-  // }));
-  return []; // fix later
 }
 
 function parseHealthData(jsonString: string): HistoricalHealthData {
@@ -856,29 +829,33 @@ function parseHealthData(jsonString: string): HistoricalHealthData {
 /**
  * Fetches all layouts for a given user.
  */
-async function getLayouts(userId: number): Promise<DBLayout[]> {
+async function getLayouts(userId: number): Promise<TypedLayout[]> {
   const layouts = await DBAdapter.getPrismaClient().layout.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },
   });
   // Assume that the layout column stores the complete Layout object as JSON
-  // @ts-ignore fix later
-  return layouts as DBLayout[];
+  return layouts.map(row => ({
+    ...row,
+    widgets: row.widgets as unknown as Widget[]
+  }));
 }
 
 /**
  * Creates a new layout for the user.
  */
-async function createLayout(userId: number, data: DBLayout): Promise<DBLayout> {
-  const newRecord = await DBAdapter.getPrismaClient().layout.create({
+async function createLayout(userId: number, data: TypedLayout): Promise<TypedLayout> {
+  const rec = await prisma.layout.create({
     data: {
       userId,
-      widgets: data.widgets as unknown as Prisma.InputJsonValue[],
       name: data.name,
+      widgets: data.widgets as unknown as Prisma.InputJsonValue[],
     },
   });
-  // @ts-ignore fix later
-  return newRecord as DBLayout;
+  return {
+    ...rec,
+    widgets: rec.widgets as unknown as Widget[],
+  };
 }
 
 /**
@@ -887,9 +864,9 @@ async function createLayout(userId: number, data: DBLayout): Promise<DBLayout> {
  */
 async function updateLayout(
   userId: number,
-  layoutId: string,
-  layoutData?: Layout
-): Promise<DBLayout> {
+  layoutId: number,
+  layoutData?: TypedLayout
+): Promise<TypedLayout> {
   // First, check that the layout exists and belongs to the user.
   const existing = await DBAdapter.getPrismaClient().layout.findFirst({
     where: { id: layoutId, userId },
@@ -898,23 +875,24 @@ async function updateLayout(
     throw new Error("Layout not found or unauthorized");
   }
 
-  const updatedRecord = await DBAdapter.getPrismaClient().layout.update({
-    where: { id: layoutId },
+  const rec = await prisma.layout.update({
+    where: { id: existing.id, userId },
     data: {
-      widgets: layoutData?.widgets as unknown as Prisma.InputJsonValue[],
       name: layoutData?.name,
+      widgets: layoutData?.widgets as unknown as Prisma.InputJsonValue[],
     },
   });
-
-  // @ts-ignore fix later
-  return updatedRecord as DBLayout;
+  return {
+    ...rec,
+    widgets: rec.widgets as unknown as Widget[],
+  };
 }
 
 /**
  * Deletes a layout for the user.
  * Throws an error if the layout is not found or does not belong to the user.
  */
-async function deleteLayout(userId: number, layoutId: string): Promise<void> {
+async function deleteLayout(userId: number, layoutId: number): Promise<void> {
   const existing = await DBAdapter.getPrismaClient().layout.findFirst({
     where: { id: layoutId, userId },
   });
@@ -929,7 +907,7 @@ async function deleteLayout(userId: number, layoutId: string): Promise<void> {
 /**
  * Fetch all counters for a given user.
  */
-async function getCounters(userId: number): Promise<DBCounter[]> {
+async function getCounters(userId: number): Promise<Counter[]> {
   return await DBAdapter.getPrismaClient().counter.findMany({
     where: { userId },
     orderBy: { name: "asc" },
@@ -942,7 +920,7 @@ async function getCounters(userId: number): Promise<DBCounter[]> {
 async function getCounterById(
   userId: number,
   counterId: number
-): Promise<DBCounter | null> {
+): Promise<Counter | null> {
   return await DBAdapter.getPrismaClient().counter.findFirst({
     where: { id: counterId, userId },
   });
@@ -951,10 +929,7 @@ async function getCounterById(
 /**
  * Create a new counter for the user.
  */
-async function createCounter(
-  userId: number,
-  data: Counter
-): Promise<DBCounter> {
+async function createCounter(userId: number, data: Counter): Promise<Counter> {
   return await DBAdapter.getPrismaClient().counter.create({
     data: { userId, name: data.name, value: data.value },
   });
@@ -967,8 +942,8 @@ async function createCounter(
 async function updateCounter(
   userId: number,
   counterId: number,
-  data: DBCounter
-): Promise<DBCounter> {
+  data: Counter
+): Promise<Counter> {
   const existing = await DBAdapter.getPrismaClient().counter.findFirst({
     where: { id: counterId, userId },
   });

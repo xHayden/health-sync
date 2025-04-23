@@ -1,18 +1,17 @@
 import { create } from "zustand";
 import axios from "axios";
 import { toast } from "sonner";
-import { DBLayout, Widget } from "@/types/WidgetData";
+import { TypedLayout, Widget } from "@/types/WidgetData";
 import { Session } from "next-auth";
 import widgetRegistry, { WidgetValue, WidgetMetaDataTypes, WidgetSetting } from "@/lib/widgetRegistry";
 
 interface LayoutStateStore {
-  // Layout state
-  layouts?: DBLayout[];
-  currentLayout?: DBLayout;
-  originalLayout?: DBLayout;
+  layouts?: TypedLayout[];
+  currentLayout?: TypedLayout;
+  originalLayout?: TypedLayout;
   hasLayoutChanged: boolean;
-  setLayouts: (layouts: DBLayout[]) => void;
-  setCurrentLayout: (layout: DBLayout) => void;
+  setLayouts: (layouts: TypedLayout[]) => void;
+  setCurrentLayout: (layout: TypedLayout) => void;
   updateCurrentLayoutWidgets: (widgets: Widget[]) => void;
   createLayout: (user: Session["user"], name?: string) => Promise<void>;
   updateLayoutName: (
@@ -178,7 +177,7 @@ export const useStore = create<LayoutStateStore>((set, get) => ({
     }
     if (layouts) {
       const selectedLayout = layouts.find(
-        (layout: DBLayout) => layout.id === layoutId
+        (layout: TypedLayout) => layout.id === layoutId
       );
       if (selectedLayout) {
         set({

@@ -13,8 +13,8 @@
 import React from "react";
 import WorkoutChart, { WorkoutChartProps } from "@/components/widgets/WorkoutChart";
 import { ActivityCalendar } from "@/components/widgets/ActivityCalendar";
-import { DBDailyWorkoutSummary } from "@/types/HealthData";
 import Counter, { CounterProps } from "@/components/widgets/Counter";
+import { DailyWorkoutSummary } from "@prisma/client";
 
 /**
  * Enum listing the different types of meta data that widgets may require.
@@ -127,11 +127,6 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
           totalWorkoutTime: 100,
           exerciseTypes: ["strength", "endurance"],
           id: 1,
-          user: {
-            id: 1,
-            email: "test@test.com",
-            createdAt: "2024-01-01",
-          },
         },
         {
           date: new Date("2024-01-02"),
@@ -202,11 +197,6 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
           totalWorkoutTime: 100,
           exerciseTypes: ["strength", "endurance"],
           id: 1,
-          user: {
-            id: 1,
-            email: "test@test.com",
-            createdAt: "2024-01-01",
-          },
         },
         {
           date: new Date("2024-01-02"),
@@ -222,7 +212,7 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
             createdAt: "2024-01-01",
           },
         },
-      ] as DBDailyWorkoutSummary[],
+      ] as DailyWorkoutSummary[],
     },
     settings: [
       {

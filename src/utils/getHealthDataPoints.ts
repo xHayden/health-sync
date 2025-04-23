@@ -1,6 +1,4 @@
-// thanks chatgpt, I know this can be dynamically generated but this is simpler.
-
-import { DBHealthDataPoint } from "@/types/HealthData";
+import { HealthDataPoint } from "@prisma/client";
 import { DBAdapter } from "./db";
 
 export async function getHealthDataByCategory(
@@ -8,35 +6,33 @@ export async function getHealthDataByCategory(
   category: string,
   startTime?: Date,
   endTime?: Date
-): Promise<DBHealthDataPoint[]> {
-  return [];
-  // const whereClause: any = {
-  //   userId,
-  //   category,
-  // };
+): Promise<HealthDataPoint[]> {
+  const whereClause: any = {
+    userId,
+    category,
+  };
 
-  // if (startTime || endTime) {
-  //   whereClause.timestamp = {};
-  //   if (startTime) whereClause.timestamp.gte = startTime;
-  //   if (endTime) whereClause.timestamp.lte = endTime;
-  // }
+  if (startTime || endTime) {
+    whereClause.timestamp = {};
+    if (startTime) whereClause.timestamp.gte = startTime;
+    if (endTime) whereClause.timestamp.lte = endTime;
+  }
 
-  // return DBAdapter.getPrismaClient().healthDataPoint.findMany({
-  //   where: whereClause,
-  //   orderBy: { timestamp: "asc" },
-  // });
+  return DBAdapter.getPrismaClient().healthDataPoint.findMany({
+    where: whereClause,
+    orderBy: { timestamp: "asc" },
+  });
 }
 
 // Fetch the latest health data point for a given category
 export async function getLatestHealthDataPoint(
   userId: number,
   category: string
-): Promise<DBHealthDataPoint | null> {
-  return null;
-  // return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
-  //   where: { userId, category },
-  //   orderBy: { timestamp: "desc" },
-  // });
+): Promise<HealthDataPoint | null> {
+  return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
+    where: { userId, category },
+    orderBy: { timestamp: "desc" },
+  });
 }
 
 // Fetch the latest health data point on a specific day
@@ -44,26 +40,24 @@ export async function getLatestHealthDataPointOnDay(
   userId: number,
   category: string,
   date: Date
-): Promise<DBHealthDataPoint | null> {
+): Promise<HealthDataPoint | null> {
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
 
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(startOfDay.getDate() + 1);
 
-  return null;
-
-  // return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
-  //   where: {
-  //     userId,
-  //     category,
-  //     timestamp: {
-  //       gte: startOfDay,
-  //       lt: endOfDay,
-  //     },
-  //   },
-  //   orderBy: { timestamp: "desc" },
-  // });
+  return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
+    where: {
+      userId,
+      category,
+      timestamp: {
+        gte: startOfDay,
+        lt: endOfDay,
+      },
+    },
+    orderBy: { timestamp: "desc" },
+  });
 }
 
 // Fetch all health data points for a given category
@@ -72,7 +66,7 @@ export async function getAllHealthDataPoints(
   category: string,
   startTime?: Date,
   endTime?: Date
-): Promise<DBHealthDataPoint[]> {
+): Promise<HealthDataPoint[]> {
   return getHealthDataByCategory(userId, category, startTime, endTime);
 }
 

@@ -1,10 +1,4 @@
-import {
-  DBHealthDataPoint,
-  DBWorkout,
-  HealthDataPoint,
-  PrismaDailyWorkoutSummaryInput,
-  Workout,
-} from "@/types/HealthData";
+import { WorkoutWithHeartRateSamples } from "@/types/HealthData";
 import {
   getWorkouts,
   getMaxHeartRate,
@@ -17,7 +11,7 @@ import {
   getAllHRVs as getAllHRV,
   getAllSteps,
 } from "./getHealthDataPoints";
-
+import { HealthDataPoint, Prisma, Workout } from "@prisma/client";
 const { performance } = require("perf_hooks");
 
 /**
@@ -30,7 +24,7 @@ const { performance } = require("perf_hooks");
  * TRIMP for each interval.
  */
 function calculateTRIMPexp(
-  datapoints: DBHealthDataPoint[] | undefined,
+  datapoints: HealthDataPoint[] | undefined,
   maxHeartRate: number,
   restingHeartRate: number
 ): number {
@@ -65,9 +59,9 @@ function calculateTRIMPexp(
 }
 
 function calculateDailyTRIMP(
-  workouts: DBWorkout[],
+  workouts: WorkoutWithHeartRateSamples[],
   maxHeartRate: number,
-  groupedRestingHeartRates: Map<string, DBHealthDataPoint[]>,
+  groupedRestingHeartRates: Map<string, HealthDataPoint[]>,
   startDate: Date,
   endDate: Date
 ): { [date: string]: number } {
@@ -85,7 +79,7 @@ function calculateDailyTRIMP(
   for (const workout of workouts) {
     const workoutDate = workout.timestamp;
     const workoutDateString = workoutDate.toISOString().split("T")[0];
-    
+
     // Find the most recent resting heart rate up to this date
     let restingHeartRate: number;
     const today = groupedRestingHeartRates.get(workoutDateString);
@@ -95,16 +89,16 @@ function calculateDailyTRIMP(
     } else {
       // Look for the most recent previous day with data
       const previousDates = Array.from(groupedRestingHeartRates.keys())
-        .filter(date => date < workoutDateString)
+        .filter((date) => date < workoutDateString)
         .sort()
         .reverse();
-      
+
       const mostRecentDate = previousDates[0];
-      const mostRecentReadings = mostRecentDate 
+      const mostRecentReadings = mostRecentDate
         ? groupedRestingHeartRates.get(mostRecentDate)
         : undefined;
-      
-      restingHeartRate = mostRecentReadings 
+
+      restingHeartRate = mostRecentReadings
         ? mostRecentReadings[mostRecentReadings.length - 1].value
         : 60; // fallback value, consider throwing an error instead
     }
@@ -114,7 +108,7 @@ function calculateDailyTRIMP(
       maxHeartRate,
       restingHeartRate
     );
-    
+
     dailyTrimps[workoutDateString] += trimps;
   }
   return dailyTrimps;
@@ -186,7 +180,7 @@ function groupDataByDate<T extends { timestamp: string | Date }>(
 }
 
 function getLatestBodyweightByDate(
-  bodyweights: DBHealthDataPoint[]
+  bodyweights: HealthDataPoint[]
 ): Map<string, number> {
   const latestBodyweight = new Map<string, number>();
   for (const bw of bodyweights) {
@@ -200,18 +194,18 @@ function getLatestBodyweightByDate(
 }
 
 function calculateWorkoutSummaries(
-  workouts: DBWorkout[],
+  workouts: Workout[],
   maxHeartRate: number,
-  heartRates: DBHealthDataPoint[],
-  restingHeartRates: DBHealthDataPoint[],
+  heartRates: HealthDataPoint[],
+  restingHeartRates: HealthDataPoint[],
   startDate: Date,
   endDate: Date,
-  bodyweights: DBHealthDataPoint[],
-  steps: DBHealthDataPoint[],
-  hrvSamples: DBHealthDataPoint[],
-  hrvCoVSamples: HealthDataPoint[],
+  bodyweights: HealthDataPoint[],
+  steps: HealthDataPoint[],
+  hrvSamples: HealthDataPoint[],
+  hrvCoVSamples: Prisma.HealthDataPointCreateInput[],
   userId: number
-): PrismaDailyWorkoutSummaryInput[] {
+): Prisma.DailyWorkoutSummaryCreateInput[] {
   // Pre-group data by date
   const groupedSteps = groupDataByDate(steps);
   const groupedHrv = groupDataByDate(hrvSamples);
@@ -234,7 +228,7 @@ function calculateWorkoutSummaries(
     new Date(endDate.getTime())
   );
 
-  const summaries: PrismaDailyWorkoutSummaryInput[] = [];
+  const summaries: Prisma.DailyWorkoutSummaryCreateInput[] = [];
   for (
     let d = new Date(startDate.getTime());
     d <= endDate;
@@ -284,17 +278,20 @@ function calculateWorkoutSummaries(
     // Convert existing metrics into connect arrays
     // We rely on the unique constraint (userId, timestamp, category) in HealthDataPoint
     const existingConnect = existingMetrics.map((m) => ({
-      userId,
-      timestamp: m.timestamp,
-      category: m.category,
-    }));
+      userId_timestamp_category: {
+        userId,
+        timestamp: m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp),
+        category: m.category,
+      },
+    }));    
 
     // Prepare new HRV CoV metrics for creation
     const newCreate = newMetrics.map((m) => ({
-      timestamp: m.timestamp,
+      userId,
+      timestamp: m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp),
       value: m.value,
       category: m.category,
-    }));
+    }));    
 
     // Create summary
     summaries.push({
@@ -309,8 +306,7 @@ function calculateWorkoutSummaries(
           if (workout.endTimestamp) {
             return (
               sum +
-              (workout.endTimestamp.getTime() -
-                workout.timestamp.getTime()) /
+              (workout.endTimestamp.getTime() - workout.timestamp.getTime()) /
                 60000
             );
           }
@@ -334,10 +330,10 @@ function calculateWorkoutSummaries(
       steps: dailySteps,
       workouts: {
         connect: workouts
-          .filter((workout: DBWorkout) => {
+          .filter((workout: Workout) => {
             return workout.timestamp.toISOString().split("T")[0] === dateString;
           })
-          .map((workout: DBWorkout) => ({ id: workout.id })),
+          .map((workout: Workout) => ({ id: workout.id })),
       },
       exerciseTypes: Array.from(
         new Set(
@@ -353,6 +349,11 @@ function calculateWorkoutSummaries(
         )
       ),
       bodyweight: bodyweight,
+      user: {
+        connect: {
+          id: userId
+        }
+      },
       // Connect existing metrics and create new HRV CoV metrics
       healthDataPointMetrics: {
         connect: existingConnect,
@@ -364,22 +365,25 @@ function calculateWorkoutSummaries(
   return summaries;
 }
 
-function calculateHrvCoV(hrvSamples: DBHealthDataPoint[]): HealthDataPoint[] {
+function calculateHrvCoV(
+  hrvSamples: HealthDataPoint[],
+  userId: number
+): Prisma.HealthDataPointCreateInput[] {
   if (!hrvSamples || hrvSamples.length === 0) {
     return [];
   }
 
-  const groupedByDate: { [date: string]: number[] } = {};
+  const groupedByDate: Record<string, number[]> = {};
 
   for (const sample of hrvSamples) {
-    const dateString = new Date(sample.timestamp).toISOString().split("T")[0];
-    if (!groupedByDate[dateString]) {
-      groupedByDate[dateString] = [];
+    const date = new Date(sample.timestamp).toISOString().split("T")[0];
+    if (!groupedByDate[date]) {
+      groupedByDate[date] = [];
     }
-    groupedByDate[dateString].push(sample.value);
+    groupedByDate[date].push(sample.value);
   }
 
-  const hrvCoVSamples: HealthDataPoint[] = [];
+  const hrvCoVSamples: Prisma.HealthDataPointCreateInput[] = [];
 
   for (const [date, values] of Object.entries(groupedByDate)) {
     if (values.length > 1) {
@@ -389,15 +393,19 @@ function calculateHrvCoV(hrvSamples: DBHealthDataPoint[]): HealthDataPoint[] {
         values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
         (values.length - 1);
       const stdDev = Math.sqrt(variance);
-      const cov = (stdDev / mean) * 100; // CoV as a percentage
+      const cov = (stdDev / mean) * 100;
 
       hrvCoVSamples.push({
-        timestamp: `${date}T00:00:00Z`,
+        timestamp: new Date(`${date}T00:00:00Z`),
         value: cov,
         category: "hrv_cov",
+        user: {
+          connect: { id: userId }
+        },
       });
     }
   }
+
   return hrvCoVSamples;
 }
 
@@ -407,7 +415,7 @@ async function calculateAndStoreWorkoutSummaries(
   const workouts = await getWorkouts(userId);
   const bodyweights = await getAllBodyMass(userId);
   const hrvSamples = await getAllHRV(userId);
-  const hrvCoVSamples = calculateHrvCoV(hrvSamples);
+  const hrvCoVSamples = calculateHrvCoV(hrvSamples, userId);
   const steps = await getAllSteps(userId);
   const maxHeartRate = await getMaxHeartRate(userId, 30);
   const restingHeartRates = await getRestingHeartRates(userId);
@@ -429,7 +437,7 @@ async function calculateAndStoreWorkoutSummaries(
   endDate.setUTCHours(23, 59, 59, 999);
   console.log("Start, end", startDate.toISOString(), endDate.toISOString());
 
-  const workoutSummaries: PrismaDailyWorkoutSummaryInput[] =
+  const workoutSummaries: Prisma.DailyWorkoutSummaryCreateInput[] =
     calculateWorkoutSummaries(
       workouts,
       maxHeartRate,
@@ -448,15 +456,15 @@ async function calculateAndStoreWorkoutSummaries(
 }
 
 function isDBHealthDataPoint(
-  point: DBHealthDataPoint | HealthDataPoint
-): point is DBHealthDataPoint {
-  return point.timestamp instanceof Date;
+  point: any
+): point is HealthDataPoint & { id: number } {
+  return 'id' in point && 'userId' in point;
 }
 
 function isHealthDataPoint(
-  point: DBHealthDataPoint | HealthDataPoint
-): point is HealthDataPoint {
-  return typeof point.timestamp === "string";
+  point: any
+): point is Prisma.HealthDataPointCreateInput {
+  return !('id' in point);
 }
 
 export {

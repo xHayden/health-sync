@@ -89,6 +89,7 @@ model Workout {
   type                  String
   dailyWorkoutSummary   DailyWorkoutSummary? @relation("WorkoutsInSummary", fields: [dailyWorkoutSummaryId], references: [id])
   dailyWorkoutSummaryId Int?
+  workoutType           String?
 
   @@unique([userId, timestamp])
 }
@@ -144,7 +145,7 @@ model HealthDataPoint {
 }
 
 model Layout {
-  id            String         @id @default(uuid())
+  id            Int            @id @default(autoincrement())
   userId        Int
   widgets       Json[]
   name          String?
@@ -170,7 +171,7 @@ enum PermissionType {
 model SharedLayout {
   id           Int                     @id @default(autoincrement())
   layout       Layout                  @relation(fields: [layoutId], references: [id], onDelete: Cascade)
-  layoutId     String
+  layoutId     Int
   owner        User                    @relation(name: "owner", fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId      Int
   sharedUser   User                    @relation(name: "sharedUser", fields: [sharedUserId], references: [id], onDelete: Cascade)

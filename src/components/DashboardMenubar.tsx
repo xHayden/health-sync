@@ -14,7 +14,6 @@ import {
 import { Button } from "./ui/button";
 import { PlusIcon, TrashIcon, Pencil2Icon } from "@radix-ui/react-icons";
 import { useStore } from "@/lib/store/layoutStore";
-import { DBLayout } from "@/types/WidgetData";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Session } from "next-auth";
+import { TypedLayout } from "@/types/WidgetData";
 
 export function LayoutBar({
   enabled,
@@ -202,7 +202,7 @@ export default function DashboardMenubar({
 }: {
   user: Session["user"];
   editMode: boolean;
-  layouts: DBLayout[];
+  layouts: TypedLayout[];
 }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -224,7 +224,7 @@ export default function DashboardMenubar({
         createNewLayout(user);
       }
     }
-  }, [layouts]);
+  }, [layouts, createNewLayout, setCurrentLayout, setLayouts, user]);
 
   useEffect(() => {
     setMounted(true);
@@ -249,7 +249,7 @@ export default function DashboardMenubar({
 
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [currentLayout, saveLayout, createNewLayout]);
+  }, [currentLayout, saveLayout, createNewLayout, user]);
 
   return (
     <div className="flex justify-between border-b">

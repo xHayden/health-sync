@@ -1,4 +1,4 @@
-import { SleepSession, DailySleepSummary } from "@/types/HealthData";
+import { DailySleepSummary, SleepSession } from "@prisma/client";
 import { getSleepSessions, insertSleepSummaries } from "./db";
 
 function calculateSleepMetrics(

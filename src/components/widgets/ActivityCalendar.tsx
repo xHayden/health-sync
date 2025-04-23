@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { WidgetSetting, WidgetValue } from "@/lib/widgetRegistry";
-import { DBDailyWorkoutSummary } from "@/types/HealthData";
 import { Property } from "csstype";
+import { DailyWorkoutSummary } from "@prisma/client";
 
 export interface ActivityCalendarProps {
-  workoutSummaries: DBDailyWorkoutSummary[];
+  workoutSummaries: DailyWorkoutSummary[];
   widgetType: WidgetValue;
   settings: WidgetSetting[];
 }

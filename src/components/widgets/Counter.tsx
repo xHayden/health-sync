@@ -10,11 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { WidgetSetting } from "@/lib/widgetRegistry";
-import { DBCounter, Counter as CounterType } from "@/types/HealthData";
 import { AdditionalHooks } from "../WidgetDisplay";
+import { Counter as CounterType } from "@prisma/client";
 
 export interface CounterProps {
-  counters: DBCounter[];
+  counters: CounterType[];
   additionalHooks: AdditionalHooks;
   settings: WidgetSetting[];
 }
@@ -24,7 +24,7 @@ const Counter: React.FC<CounterProps> = ({
   additionalHooks,
   settings,
 }) => {
-  const [selectedCounter, setSelectedCounter] = useState<DBCounter | undefined>(
+  const [selectedCounter, setSelectedCounter] = useState<CounterType | undefined>(
     undefined
   );
   const dataSourceValue = settings.find((s) => s.key === "dataSource")?.value;
@@ -74,17 +74,18 @@ const Counter: React.FC<CounterProps> = ({
   }, [counters]);
 
   return (
-    <div className="w-full mx-8 bg-transparent">
+    <div className="w-full mx-2 bg-transparent">
       <CardHeader className="flex items-center text-xl">
         {cardName ?? "Counter"}
       </CardHeader>
-      <CardContent className="flex items-center justify-between my-12">
+      <CardContent className="flex items-center justify-around my-6 gap-2 p-0">
         {!needsDataSource ? (
           <>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
               <Button
                 variant="outline"
                 size={"lg"}
+                className=""
                 onClick={() => handleDecrement(1)}
               >
                 -1
@@ -107,7 +108,7 @@ const Counter: React.FC<CounterProps> = ({
             <span className="text-8xl font-semibold">
               {selectedCounter?.value}
             </span>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
               <Button
                 variant="outline"
                 size={"lg"}

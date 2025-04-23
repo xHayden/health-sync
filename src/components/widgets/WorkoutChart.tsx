@@ -12,7 +12,7 @@ import {
   Customized,
 } from "recharts";
 import { Slider } from "@/components/ui/slider"; // adjust the import path as needed
-import { DBDailyWorkoutSummary } from "@/types/HealthData";
+import { DailyWorkoutSummary } from "@prisma/client";
 
 // --- CustomFill ---
 // This component draws custom filled segments (polygons) between the CTL and ATL lines.
@@ -112,7 +112,7 @@ const CustomFill = (props: any) => {
 };
 
 export interface WorkoutChartProps {
-  workoutSummaries: DBDailyWorkoutSummary[];
+  workoutSummaries: DailyWorkoutSummary[];
 }
 
 const WorkoutChart: React.FC<WorkoutChartProps> = ({ workoutSummaries }) => {

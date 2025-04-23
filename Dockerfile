@@ -27,7 +27,9 @@ CMD ["yarn", "dev"]
 
 # Production Stage
 FROM base AS prod
-COPY --from=builder /app/.next ./.next
+
+COPY --from=builder /app .
+
 ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["yarn", "start"]

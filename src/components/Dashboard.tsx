@@ -1,15 +1,29 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef } from "react";
-import { closestCenter, DndContext, PointerSensor, useSensors, useSensor } from "@dnd-kit/core";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensors,
+  useSensor,
+} from "@dnd-kit/core";
 import "react-resizable/css/styles.css";
 import DraggableResizableWidget from "./DraggableResizableWidget";
 import { useStore } from "@/lib/store/layoutStore";
 import { toast } from "sonner";
 import { Session } from "next-auth";
-import { DBLayout } from "@/types/WidgetData";
+import { TypedLayout } from "@/types/WidgetData";
 
-const Dashboard = ({ user, editMode = false, layouts }: { editMode?: boolean, user: Session["user"], layouts: DBLayout[] }) => {
+const Dashboard = ({
+  user,
+  editMode = false,
+  layouts,
+}: {
+  editMode?: boolean;
+  user: Session["user"];
+  layouts: TypedLayout[];
+}) => {
   const currentLayout = useStore((state) => state.currentLayout);
   const isInteracting = useStore((state) => state.isInteracting);
   const gridSize = useStore((state) => state.gridSize);
@@ -62,7 +76,9 @@ const Dashboard = ({ user, editMode = false, layouts }: { editMode?: boolean, us
 
   return (
     <div className="relative min-h-screen">
-      {editMode && <div className="absolute inset-0 z-0" style={gridBackgroundStyle} />}
+      {editMode && (
+        <div className="absolute inset-0 z-0" style={gridBackgroundStyle} />
+      )}
       <DndContext
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -70,25 +86,29 @@ const Dashboard = ({ user, editMode = false, layouts }: { editMode?: boolean, us
         sensors={sensors}
         // modifiers={[restrictToParentElement]}
       >
-        <div className="z-0 w-full h-full min-h-screen">
-          {currentLayout?.widgets.map((widget) => (
-            <DraggableResizableWidget
-              key={widget.id}
-              id={widget.id}
-              x={widget.x}
-              y={widget.y}
-              width={widget.width}
-              height={widget.height}
-              gridSize={gridSize}
-              onResizeStart={handleResizeStart}
-              onResizeStop={(w, h) => handleResizeStop(widget.id, w, h)}
-              onRemove={() => removeWidget(widget.id)}
-              editMode={editMode}
-              widget={widget}
-              user={user}
-            />
-          ))}
-        </div>
+        {currentLayout?.widgets ? (
+          <div className="z-0 w-full h-full min-h-screen">
+            {currentLayout?.widgets.map((widget) => (
+              <DraggableResizableWidget
+                key={widget.id}
+                id={widget.id}
+                x={widget.x}
+                y={widget.y}
+                width={widget.width}
+                height={widget.height}
+                gridSize={gridSize}
+                onResizeStart={handleResizeStart}
+                onResizeStop={(w, h) => handleResizeStop(widget.id, w, h)}
+                onRemove={() => removeWidget(widget.id)}
+                editMode={editMode}
+                widget={widget}
+                user={user}
+              />
+            ))}
+          </div>
+        ) : (
+          <div></div>
+        )}
       </DndContext>
     </div>
   );

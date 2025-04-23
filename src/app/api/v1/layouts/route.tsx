@@ -92,7 +92,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await deleteLayout(Number(userId), id);
+    await deleteLayout(Number(userId), Number(id));
     return NextResponse.json({ message: "Layout deleted successfully" });
   } catch (error: any) {
     console.error("DELETE /api/v1/layouts error:", error);

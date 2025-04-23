@@ -1,6 +1,6 @@
 import { WidgetMetaDataTypes, WidgetSetting } from "@/lib/widgetRegistry";
+import { Layout as PrismaLayout } from "@prisma/client";
 import { DBBase } from "./Prisma";
-
 export interface Widget {
   id: number;
   type: WidgetRequiredData;
@@ -15,14 +15,10 @@ export interface Widget {
   settings: WidgetSetting[];
 }
 
-interface Layout {
-  userId: number;
+/**
+ * Just like the Prisma Layout model, but with
+ * widgets: Widget[] instead of Json[] | null.
+ */
+export type TypedLayout = Omit<PrismaLayout, "widgets"> & {
   widgets: Widget[];
-  name?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  user?: User;
-}
-
-export interface DBLayout extends Layout, DBBase {
-}
+};
