@@ -1,7 +1,7 @@
 import Dashboard from "@/components/Dashboard";
 import DashboardMenubar from "@/components/DashboardMenubar";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/authOptions";
 import { redirect } from "next/navigation";
 import { getLayouts } from "@/utils/db";
 

@@ -20,7 +20,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataSourceManagerDialog from "./DataSourceManagerDialog";
 import { DropdownDataSource } from "./DropdownDataSource";
@@ -45,19 +51,21 @@ export interface DraggableResizableWidgetProps {
   user: Session["user"];
 }
 
-const WidgetOptionsMenu = React.memo(
-  ({ onSettingsClick }: { onSettingsClick: (e: React.MouseEvent) => void }) => (
-    <div className="absolute top-0 right-0 z-50 m-3">
-      <Button
-        className="bg-secondary text-secondary-foreground border-secondary-foreground border hover:bg-primary hover:text-primary-foreground transition-colors duration-200 rounded-4xl"
-        onClick={onSettingsClick}
-      >
-        Settings
-      </Button>
-    </div>
-  )
-);
-
+const WidgetOptionsMenu = ({
+  onSettingsClick,
+}: {
+  onSettingsClick: (e: React.MouseEvent) => void;
+}) => (
+  <div className="absolute top-0 right-0 z-50 m-3">
+    <Button
+      className="bg-secondary text-secondary-foreground border-secondary-foreground border hover:bg-primary hover:text-primary-foreground transition-colors duration-200 rounded-4xl"
+      onClick={onSettingsClick}
+    >
+      Settings
+    </Button>
+  </div>
+)
+;
 const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
   id,
   x,
@@ -110,7 +118,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     () => widget.settings.filter((s) => s.type === "dropdown"),
     [widget.settings]
   );
-  const [dropdownValues, setDropdownValues] = useState<Record<string, string>>(  
+  const [dropdownValues, setDropdownValues] = useState<Record<string, string>>(
     () =>
       Object.fromEntries(
         dropdownSettings.map((s) => [
@@ -211,7 +219,8 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
       }
       return { ...setting, value: el.value };
     });
-    const { updateWidgetSettings, currentLayout, saveLayout } = useStore.getState();
+    const { updateWidgetSettings, currentLayout, saveLayout } =
+      useStore.getState();
     // @ts-ignore
     updateWidgetSettings(widget.id, newSettings);
     if (currentLayout) saveLayout(currentLayout.id, user);
@@ -282,9 +291,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Widget Settings</DialogTitle>
-              <DialogDescription>
-                Configure {meta.name}
-              </DialogDescription>
+              <DialogDescription>Configure {meta.name}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {widget.settings.map((setting) => (
@@ -323,7 +330,11 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
                   )}
 
                   {setting.type === "select" && (
-                    <Select defaultValue={(setting.value ?? setting.defaultValue) as string}>
+                    <Select
+                      defaultValue={
+                        (setting.value ?? setting.defaultValue) as string
+                      }
+                    >
                       <SelectTrigger id={setting.key}>
                         <SelectValue placeholder="Select…" />
                       </SelectTrigger>
@@ -342,7 +353,9 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
                       id={setting.key}
                       className="w-12 h-8"
                       type="color"
-                      defaultValue={(setting.value ?? setting.defaultValue) as string}
+                      defaultValue={
+                        (setting.value ?? setting.defaultValue) as string
+                      }
                     />
                   )}
 
@@ -352,7 +365,10 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
                       userId={user.id}
                       value={dropdownValues[setting.key]}
                       onChange={(val: any) =>
-                        setDropdownValues((prev) => ({ ...prev, [setting.key]: val }))
+                        setDropdownValues((prev) => ({
+                          ...prev,
+                          [setting.key]: val,
+                        }))
                       }
                       onManage={() => setManageSource(setting.source!)}
                     />

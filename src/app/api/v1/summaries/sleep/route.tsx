@@ -1,4 +1,4 @@
-import { getSleepSummaries } from "@/utils/db";
+// import { getSleepSummaries } from "@/utils/db";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -12,8 +12,9 @@ export async function GET(request: Request) {
         );
       }
       
-      const summaries = await getSleepSummaries(Number(userId));
-      return NextResponse.json({ data: summaries });
+      // const summaries = await getSleepSummaries(Number(userId));
+      // return NextResponse.json({ data: summaries });
+      throw Error("Unimplemented");
     } catch (error: any) {
       console.error("GET /api/v1/summaries/sleep error:", error);
       return NextResponse.json(

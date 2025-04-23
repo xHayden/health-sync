@@ -9,21 +9,22 @@ export async function getHealthDataByCategory(
   startTime?: Date,
   endTime?: Date
 ): Promise<DBHealthDataPoint[]> {
-  const whereClause: any = {
-    userId,
-    category,
-  };
+  return [];
+  // const whereClause: any = {
+  //   userId,
+  //   category,
+  // };
 
-  if (startTime || endTime) {
-    whereClause.timestamp = {};
-    if (startTime) whereClause.timestamp.gte = startTime;
-    if (endTime) whereClause.timestamp.lte = endTime;
-  }
+  // if (startTime || endTime) {
+  //   whereClause.timestamp = {};
+  //   if (startTime) whereClause.timestamp.gte = startTime;
+  //   if (endTime) whereClause.timestamp.lte = endTime;
+  // }
 
-  return DBAdapter.getPrismaClient().healthDataPoint.findMany({
-    where: whereClause,
-    orderBy: { timestamp: "asc" },
-  });
+  // return DBAdapter.getPrismaClient().healthDataPoint.findMany({
+  //   where: whereClause,
+  //   orderBy: { timestamp: "asc" },
+  // });
 }
 
 // Fetch the latest health data point for a given category
@@ -31,10 +32,11 @@ export async function getLatestHealthDataPoint(
   userId: number,
   category: string
 ): Promise<DBHealthDataPoint | null> {
-  return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
-    where: { userId, category },
-    orderBy: { timestamp: "desc" },
-  });
+  return null;
+  // return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
+  //   where: { userId, category },
+  //   orderBy: { timestamp: "desc" },
+  // });
 }
 
 // Fetch the latest health data point on a specific day
@@ -49,17 +51,19 @@ export async function getLatestHealthDataPointOnDay(
   const endOfDay = new Date(startOfDay);
   endOfDay.setDate(startOfDay.getDate() + 1);
 
-  return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
-    where: {
-      userId,
-      category,
-      timestamp: {
-        gte: startOfDay,
-        lt: endOfDay,
-      },
-    },
-    orderBy: { timestamp: "desc" },
-  });
+  return null;
+
+  // return DBAdapter.getPrismaClient().healthDataPoint.findFirst({
+  //   where: {
+  //     userId,
+  //     category,
+  //     timestamp: {
+  //       gte: startOfDay,
+  //       lt: endOfDay,
+  //     },
+  //   },
+  //   orderBy: { timestamp: "desc" },
+  // });
 }
 
 // Fetch all health data points for a given category

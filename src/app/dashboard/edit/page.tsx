@@ -1,4 +1,4 @@
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/authOptions";
 import Dashboard from "@/components/Dashboard";
 import DashboardMenubar from "@/components/DashboardMenubar";
 import WidgetSearchModal from "@/components/WidgetSearchModal";
@@ -6,7 +6,7 @@ import { getLayouts } from "@/utils/db";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
-const EditWidgetPanelPage = async ({ editMode = true }: { userId: number, editMode?: boolean }) => {
+const EditWidgetPanelPage = async () => {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) {
     redirect("/login");
@@ -26,8 +26,8 @@ const EditWidgetPanelPage = async ({ editMode = true }: { userId: number, editMo
 
   return (
     <>
-      <DashboardMenubar user={session.user} editMode={editMode} layouts={layouts} />
-      <Dashboard editMode={editMode} user={session.user} layouts={layouts} />
+      <DashboardMenubar user={session.user} editMode={true} layouts={layouts} />
+      <Dashboard editMode={true} user={session.user} layouts={layouts} />
       <WidgetSearchModal />
     </>
   );

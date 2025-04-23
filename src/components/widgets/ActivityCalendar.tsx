@@ -15,10 +15,6 @@ export function ActivityCalendar({
   widgetType,
   settings,
 }: ActivityCalendarProps) {
-  if (!settings) {
-    return <div>No settings</div>;
-  }
-
   // Memoize extraction of setting values
   const dailyWorkoutGoal = useMemo(() => {
     return (
@@ -70,6 +66,10 @@ export function ActivityCalendar({
       })
       .map((workout) => new Date(workout.date));
   }, [workoutSummaries, dailyWorkoutGoal, countNoExerciseAsFailedToMeetGoal]);
+
+  if (!settings) {
+    return <div>No settings</div>;
+  }
 
   return (
     <div className="rounded-md shadow-sm w-full h-full">

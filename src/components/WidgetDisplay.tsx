@@ -1,18 +1,14 @@
 import React from "react";
 import widgetRegistry, {
-  Dropdown,
-  DropdownItem,
   WidgetMetaDataTypes,
-  WidgetSetting,
   WidgetValue,
 } from "@/lib/widgetRegistry";
 import { Widget } from "@/types/WidgetData";
 import { useWorkoutSummaries } from "@/hooks/useWorkoutSummaries";
 import { useSleepSummaries } from "@/hooks/useSleepSummaries";
-import { Counter, DBDailyWorkoutSummary } from "@/types/HealthData";
-import { Session } from "next-auth";
 import { useCounters } from "@/hooks/useCounters";
-import { getCounters } from "@/utils/db";
+import { Session } from "next-auth";
+import { Counter, DBDailyWorkoutSummary } from "@/types/HealthData";
 import { UseMutationResult } from "@tanstack/react-query";
 
 interface WidgetDisplayProps {
@@ -21,36 +17,28 @@ interface WidgetDisplayProps {
 }
 
 export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
-  // Look up the meta info and the actual component from the registry.
-  if (!widget.type || !widgetRegistry[widget.type as WidgetValue]) {
-    return <div>No widget type</div>;
-  }
   const widgetMeta = widgetRegistry[widget.type as WidgetValue];
-  const WidgetComponent = widgetMeta.component;
+  const WidgetComponent = widgetMeta?.component;
 
-  // Determine if a required data type is missing.
+  const required = widgetMeta?.requiredData ?? [];
   const needsWorkoutData =
-    widgetMeta.requiredData.includes(WidgetMetaDataTypes.WorkoutSummaries) &&
-    (widget.data[WidgetMetaDataTypes.WorkoutSummaries] === null || widget.data[WidgetMetaDataTypes.WorkoutSummaries] === undefined);
+    required.includes(WidgetMetaDataTypes.WorkoutSummaries) &&
+    widget.data[WidgetMetaDataTypes.WorkoutSummaries] == null;
   const needsSleepData =
-    widgetMeta.requiredData.includes(WidgetMetaDataTypes.SleepSummaries) &&
-    (widget.data[WidgetMetaDataTypes.SleepSummaries] === null || widget.data[WidgetMetaDataTypes.SleepSummaries] === undefined);
+    required.includes(WidgetMetaDataTypes.SleepSummaries) &&
+    widget.data[WidgetMetaDataTypes.SleepSummaries] == null;
   const needsActivityDaysLevelsData =
-    widgetMeta.requiredData.includes(WidgetMetaDataTypes.ActivityDaysLevels) &&
-    (widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === null || widget.data[WidgetMetaDataTypes.ActivityDaysLevels] === undefined);
+    required.includes(WidgetMetaDataTypes.ActivityDaysLevels) &&
+    widget.data[WidgetMetaDataTypes.ActivityDaysLevels] == null;
   const needsCounterData =
-    widgetMeta.requiredData.includes(WidgetMetaDataTypes.Counters) &&
-    (widget.data[WidgetMetaDataTypes.Counters] === null || widget.data[WidgetMetaDataTypes.Counters] === undefined);
+    required.includes(WidgetMetaDataTypes.Counters) &&
+    widget.data[WidgetMetaDataTypes.Counters] == null;
 
-  // Conditionally fetch missing data.
   const {
     data: workoutData,
     isLoading: isLoadingWorkout,
     error: workoutError,
-  } = useWorkoutSummaries(
-    user.id,
-    needsWorkoutData || needsActivityDaysLevelsData
-  );
+  } = useWorkoutSummaries(user.id, needsWorkoutData || needsActivityDaysLevelsData);
 
   const {
     data: sleepData,
@@ -62,15 +50,17 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     data: counterData,
     isLoading: isLoadingCounters,
     error: counterError,
-    updateCounter
+    updateCounter,
   } = useCounters(user.id, needsCounterData);
 
-  // Optionally handle errors.
+  if (!widgetMeta) {
+    return <div>No widget type</div>;
+  }
+
   if (workoutError || sleepError || counterError) {
     return <div>Error loading widget data.</div>;
   }
 
-  // While any required data is loading, show a loading indicator.
   if (
     (needsWorkoutData && isLoadingWorkout) ||
     (needsSleepData && isLoadingSleep) ||
@@ -79,17 +69,10 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     return <div>Loading...</div>;
   }
 
-  // Prepare the data props for the widget component.
-  // Start with the existing widget.data.
   const dataProps = { ...widget.data };
 
-  // Overwrite any missing data with fetched data.
-  if (needsWorkoutData && workoutData) {
-    if (Array.isArray(workoutData)) {
-      dataProps[WidgetMetaDataTypes.WorkoutSummaries] = workoutData;
-    } else {
-      console.error("Workout data is not an array.");
-    }
+  if (needsWorkoutData && Array.isArray(workoutData)) {
+    dataProps[WidgetMetaDataTypes.WorkoutSummaries] = workoutData;
   }
   if (needsSleepData && sleepData) {
     dataProps[WidgetMetaDataTypes.SleepSummaries] = sleepData;
@@ -98,36 +81,35 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     dataProps[WidgetMetaDataTypes.Counters] = counterData;
   }
   if (needsActivityDaysLevelsData && workoutData) {
-    const activityData = {
-      metGoalDays: workoutData.map((workout: DBDailyWorkoutSummary) => {
-        if (workout.date && workout.totalWorkoutTime > 60) {
-          return workout.date;
-        }
-        return null;
-      }),
-      exercisedButFailedToMeetGoalDays: workoutData.map(
-        (workout: DBDailyWorkoutSummary) => {
-          if (
-            workout.date &&
-            workout.totalWorkoutTime <= 60 &&
-            workout.totalWorkoutTime > 0
-          ) {
-            return workout.date;
-          }
-          return null;
-        }
-      ),
+    dataProps[WidgetMetaDataTypes.ActivityDaysLevels] = {
+      metGoalDays: workoutData
+        .map((w: DBDailyWorkoutSummary) =>
+          w.totalWorkoutTime > 60 ? w.date : null
+        )
+        .filter(Boolean),
+      exercisedButFailedToMeetGoalDays: workoutData
+        .map((w: DBDailyWorkoutSummary) =>
+          w.totalWorkoutTime > 0 && w.totalWorkoutTime <= 60 ? w.date : null
+        )
+        .filter(Boolean),
     };
-    dataProps[WidgetMetaDataTypes.ActivityDaysLevels] = activityData;
   }
 
-  const additionalHooks: AdditionalHooks = {
-    updateCounter
-  }
-
-  return <WidgetComponent widgetMeta={widgetMeta} widgetId={widget.id} widgetType={widget.type} {...dataProps} settings={widget.settings} additionalHooks={additionalHooks} />;
+  // 6) Finally render
+  return (
+    <WidgetComponent
+      widgetMeta={widgetMeta}
+      widgetId={widget.id}
+      widgetType={widget.type}
+      {...dataProps}
+      settings={widget.settings}
+      additionalHooks={{ updateCounter } as AdditionalHooks}
+    />
+  );
 }
 
 export interface AdditionalHooks {
-  updateCounter: UseMutationResult<Counter, Error, { id: number; } & Partial<Omit<Counter, "id">>, unknown>;
+  updateCounter: UseMutationResult<Counter, Error, {
+    id: number;
+} & Partial<Omit<Counter, "id">>, unknown>
 }

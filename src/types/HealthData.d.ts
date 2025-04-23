@@ -160,6 +160,11 @@ export interface PrismaHealthDataPointInput extends HealthDataPoint {
   dailySleepSummary?: connectId;
 }
 
+export type PrismaHealthDataPointWhereUniqueInput =
+  | { id: number }
+  | { userId: number; timestamp: Date; category: string };
+
+
 export interface PrismaSleepSessionInput extends SleepSession {
   dailySleepSummary?: connectId;
   user?: connectId;
@@ -177,11 +182,7 @@ export interface PrismaDailyWorkoutSummaryInput extends DailyWorkoutSummary {
     create: HealthDataPoint[];
     connect:
       | { id: number }[]
-      | {
-          timestamp: Date;
-          category: string;
-          userId: number;
-        }[];
+      | HealthDataPointWhereUniqueInput[];
   };
 }
 
