@@ -153,6 +153,7 @@ model Layout {
   updatedAt     DateTime       @updatedAt
   user          User           @relation(fields: [userId], references: [id])
   sharedLayouts SharedLayout[]
+  onDashboard   Boolean        @default(false)
 }
 
 model Counter {
@@ -165,7 +166,8 @@ model Counter {
 
 enum PermissionType {
   READ
-  WRITE
+  WRITE 
+  NONE
 }
 
 model SharedLayout {
@@ -176,19 +178,21 @@ model SharedLayout {
   ownerId      Int
   sharedUser   User                    @relation(name: "sharedUser", fields: [sharedUserId], references: [id], onDelete: Cascade)
   sharedUserId Int
-  token        String                  @unique
+  token        String?                 @unique // only optional for a brief moment. if missing, don't accept.
   expires      DateTime? // null for no expiration
   dataScopes   SharedLayoutDataScope[]
+  onDashboard  Boolean?                @default(false)
 }
 
 model SharedLayoutDataScope {
   id             Int              @id @default(autoincrement())
   sharedLayout   SharedLayout     @relation(fields: [sharedLayoutId], references: [id], onDelete: Cascade)
   sharedLayoutId Int
-  // e.g. "Counter", "Workout", "SleepSession", etc.
-  resourceType   String
+  resourceType   String // dataSource name or widget required data name.
+  // For dataSources,
   // If you want to share *all* counters: resourceId = null
   // If only specific counters: resourceId = the counter.id
+  // For widget required data, provide null.
   resourceId     Int?
   permissions    PermissionType[]
 

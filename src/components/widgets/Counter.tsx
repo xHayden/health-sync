@@ -42,7 +42,6 @@ const Counter: React.FC<CounterProps> = ({
   }, [dataSourceValue, counters, selectedCounter]);
 
   const handleIncrement = (n: number = 1) => {
-    console.log(selectedCounter);
     if (!selectedCounter) return;
     const newValue = selectedCounter.value + n;
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });

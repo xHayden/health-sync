@@ -1,10 +1,13 @@
 import { authOptions } from "@/lib/authOptions";
 import Dashboard from "@/components/Dashboard";
-import DashboardMenubar from "@/components/DashboardMenubar";
+import DashboardMenubar from "@/components/menubar/DashboardMenubar";
 import WidgetSearchModal from "@/components/WidgetSearchModal";
-import { getLayouts } from "@/utils/db";
+import { getLayouts, getSharedLayoutsForMember } from "@/utils/db";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import {
+  SharedLayoutWithOwner,
+} from "@/types/WidgetData";
 
 const EditWidgetPanelPage = async () => {
   const session = await getServerSession(authOptions);
@@ -12,22 +15,21 @@ const EditWidgetPanelPage = async () => {
     redirect("/login");
   }
 
-  // useEffect(() => {
-  //   if (hasLayoutChanged) {
-  //     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-  //       event.preventDefault();
-  //       event.returnValue = "";
-  //     };
-  //     window.addEventListener("beforeunload", handleBeforeUnload);
-  //     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  //   }
-  // }, [hasLayoutChanged]);
-  const layouts = await getLayouts(session.user.id);
+  const userLayouts = await getLayouts(session.user.id, true);
+  const sharedLayoutsData = await getSharedLayoutsForMember(session.user.id);
+  const sharedLayouts = sharedLayoutsData.map(
+    (shared: SharedLayoutWithOwner) => shared.layout
+  );
 
   return (
     <>
-      <DashboardMenubar user={session.user} editMode={true} layouts={layouts} />
-      <Dashboard editMode={true} user={session.user} layouts={layouts} />
+      <DashboardMenubar
+        user={session.user}
+        editMode={true}
+        userLayouts={userLayouts}
+        sharedLayouts={sharedLayouts}
+      />
+      <Dashboard editMode={true} user={session.user} />
       <WidgetSearchModal />
     </>
   );

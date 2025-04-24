@@ -8,9 +8,12 @@ import {
 
 // GET: fetch all Counters for a user.
 export async function GET(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
+  const sourceAuthenticatedUserId = Number(request.headers.get("x-user-id"));
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
+    const shareToken = searchParams.get("shareToken");
     if (!userId) {
       return NextResponse.json(
         { error: "Missing userId" },
@@ -18,7 +21,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const Counters = await getCounters(Number(userId));
+    const Counters = await getCounters(Number(userId), authenticated, shareToken, sourceAuthenticatedUserId);
     return NextResponse.json({ data: Counters });
   } catch (error: any) {
     console.error("GET /api/v1/Counters error:", error);
@@ -31,9 +34,10 @@ export async function GET(request: Request) {
 
 // POST: create a new Counter.
 export async function POST(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
   try {
     const body = await request.json();
-    const { userId, ...CounterData } = body;
+    const { userId, shareToken, ...CounterData } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newCounter = await createCounter(userId, CounterData);
+    const newCounter = await createCounter(userId, CounterData, authenticated, shareToken);
     return NextResponse.json(newCounter, { status: 201 });
   } catch (error: any) {
     console.error("POST /api/v1/counters error:", error);

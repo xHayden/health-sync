@@ -15,13 +15,13 @@ import { Button } from "@/components/ui/button";
 import { PlusIcon } from "@radix-ui/react-icons";
 // Import the consolidated widgetRegistry, its entries, and the literal widget key type.
 import widgetRegistry, { WidgetValue } from "@/lib/widgetRegistry";
-import { useStore } from "@/lib/store/layoutStore";
+import { useLayoutStore } from "@/lib/store/layoutStore";
 
 const WidgetSearchModal = () => {
   // State to track the search query and selected widget key.
   const [query, setQuery] = useState("");
   const [selectedWidgetKey, setSelectedWidgetKey] = useState<WidgetValue | null>(null);
-  const createWidget = useStore((state) => state.createWidget);
+  const createWidget = useLayoutStore((state) => state.createWidget);
 
   // Filter the widget entries based on the search query.
   const filteredEntries = Object.entries(widgetRegistry).filter(([, widget]) =>

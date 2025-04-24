@@ -10,29 +10,26 @@ import {
 } from "@dnd-kit/core";
 import "react-resizable/css/styles.css";
 import DraggableResizableWidget from "./DraggableResizableWidget";
-import { useStore } from "@/lib/store/layoutStore";
+import { useLayoutStore } from "@/lib/store/layoutStore";
 import { toast } from "sonner";
 import { Session } from "next-auth";
-import { TypedLayout } from "@/types/WidgetData";
 
 const Dashboard = ({
   user,
   editMode = false,
-  layouts,
 }: {
   editMode?: boolean;
   user: Session["user"];
-  layouts: TypedLayout[];
 }) => {
-  const currentLayout = useStore((state) => state.currentLayout);
-  const isInteracting = useStore((state) => state.isInteracting);
-  const gridSize = useStore((state) => state.gridSize);
-  const gridOffset = useStore((state) => state.gridOffset);
-  const removeWidget = useStore((state) => state.removeWidget);
-  const handleDragStart = useStore((state) => state.handleDragStart);
-  const handleDragEnd = useStore((state) => state.handleDragEnd);
-  const handleResizeStart = useStore((state) => state.handleResizeStart);
-  const handleResizeStop = useStore((state) => state.handleResizeStop);
+  const currentLayout = useLayoutStore((state) => state.currentLayout);
+  const isInteracting = useLayoutStore((state) => state.isInteracting);
+  const gridSize = useLayoutStore((state) => state.gridSize);
+  const gridOffset = useLayoutStore((state) => state.gridOffset);
+  const removeWidget = useLayoutStore((state) => state.removeWidget);
+  const handleDragStart = useLayoutStore((state) => state.handleDragStart);
+  const handleDragEnd = useLayoutStore((state) => state.handleDragEnd);
+  const handleResizeStart = useLayoutStore((state) => state.handleResizeStart);
+  const handleResizeStop = useLayoutStore((state) => state.handleResizeStop);
 
   const editToastDisplayed = useRef(false);
 
@@ -58,7 +55,7 @@ const Dashboard = ({
         toast.warning(
           "Edit mode is enabled. Some widgets might not work as expected.",
           {
-            duration: Infinity,
+            duration: 10,
             closeButton: true,
           }
         );
@@ -102,7 +99,7 @@ const Dashboard = ({
                 onRemove={() => removeWidget(widget.id)}
                 editMode={editMode}
                 widget={widget}
-                user={user}
+                user={currentLayout.user}
               />
             ))}
           </div>

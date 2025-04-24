@@ -17,8 +17,6 @@ export async function POST(req: Request) {
     return ResponseStatus(false, "/api/v1/sync/summaries", 400, "Missing 'id' in request body");
   }
 
-  console.log(id, "test");
-
   try {
     await calculateAndStoreWorkoutSummaries(id);
     // await calculateAndStoreSleepSummaries(id);

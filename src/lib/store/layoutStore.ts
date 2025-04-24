@@ -1,17 +1,22 @@
 import { create } from "zustand";
 import axios from "axios";
 import { toast } from "sonner";
-import { TypedLayout, Widget } from "@/types/WidgetData";
+import { TypedLayout, TypedLayoutWithUser, Widget } from "@/types/WidgetData";
 import { Session } from "next-auth";
-import widgetRegistry, { WidgetValue, WidgetMetaDataTypes, WidgetSetting } from "@/lib/widgetRegistry";
+import widgetRegistry, {
+  WidgetValue,
+  WidgetMetaDataTypes,
+  WidgetSetting,
+} from "@/lib/widgetRegistry";
 
-interface LayoutStateStore {
-  layouts?: TypedLayout[];
-  currentLayout?: TypedLayout;
-  originalLayout?: TypedLayout;
+export interface LayoutStateStore {
+  layouts?: TypedLayoutWithUser[];
+  sharedLayouts?: TypedLayoutWithUser[];
+  currentLayout?: TypedLayoutWithUser;
+  originalLayout?: TypedLayoutWithUser;
   hasLayoutChanged: boolean;
-  setLayouts: (layouts: TypedLayout[]) => void;
-  setCurrentLayout: (layout: TypedLayout) => void;
+  setLayouts: (layouts: TypedLayoutWithUser[]) => void;
+  setCurrentLayout: (layout: TypedLayoutWithUser) => void;
   updateCurrentLayoutWidgets: (widgets: Widget[]) => void;
   createLayout: (user: Session["user"], name?: string) => Promise<void>;
   updateLayoutName: (
@@ -19,9 +24,17 @@ interface LayoutStateStore {
     name: string,
     user: Session["user"]
   ) => Promise<void>;
+  updateLayoutOnDashboard: (
+    id: number,
+    onDashboard: boolean,
+    user: Session["user"]
+  ) => Promise<void>;
   saveLayout: (id: number, user: Session["user"]) => Promise<void>;
   switchLayout: (layoutId: number, user: Session["user"]) => void;
   deleteLayout: (id: number, user: Session["user"]) => Promise<void>;
+
+  // shared layouts
+  setSharedLayouts: (layouts: TypedLayoutWithUser[]) => void;
 
   // Grid state and widget interactions
   isInteracting: boolean;
@@ -42,21 +55,25 @@ interface LayoutStateStore {
 const calculateHasChanged = (newWidgets: Widget[], originalWidgets: Widget[]) =>
   JSON.stringify(newWidgets) !== JSON.stringify(originalWidgets);
 
-export const useStore = create<LayoutStateStore>((set, get) => ({
+export const useLayoutStore = create<LayoutStateStore>((set, get) => ({
   // Layout state
   layouts: undefined,
+  sharedLayouts: undefined,
   currentLayout: undefined,
   originalLayout: undefined,
   hasLayoutChanged: false,
 
   setLayouts: (layouts) => set({ layouts }),
 
-  setCurrentLayout: (layout) =>
-    set({
+  setSharedLayouts: (layouts) => set({ sharedLayouts: layouts }),
+
+  setCurrentLayout: (layout) => {
+    return set({
       currentLayout: layout,
       originalLayout: layout,
       hasLayoutChanged: false,
-    }),
+    });
+  },
 
   updateCurrentLayoutWidgets: (widgets) => {
     const { currentLayout, originalLayout } = get();
@@ -169,23 +186,33 @@ export const useStore = create<LayoutStateStore>((set, get) => ({
   },
 
   switchLayout: async (layoutId, user) => {
-    const { currentLayout, layouts, hasLayoutChanged, saveLayout } = get();
+    const {
+      currentLayout,
+      layouts,
+      hasLayoutChanged,
+      saveLayout,
+      sharedLayouts,
+    } = get();
     if (currentLayout && hasLayoutChanged) {
       // Save unsaved changes before switching.
       await saveLayout(currentLayout.id, user);
       set({ hasLayoutChanged: false });
     }
     if (layouts) {
-      const selectedLayout = layouts.find(
-        (layout: TypedLayout) => layout.id === layoutId
+      let selectedLayout;
+      selectedLayout = layouts.find(
+        (layout: TypedLayoutWithUser) => layout.id === layoutId
       );
-      if (selectedLayout) {
-        set({
-          currentLayout: selectedLayout,
-          originalLayout: selectedLayout,
-          hasLayoutChanged: false,
-        });
+      if (!selectedLayout && sharedLayouts) {
+        selectedLayout = sharedLayouts.find(
+          (layout: TypedLayoutWithUser) => layout.id === layoutId
+        );
       }
+      set({
+        currentLayout: selectedLayout,
+        originalLayout: selectedLayout,
+        hasLayoutChanged: false,
+      });
     }
   },
 
@@ -232,7 +259,7 @@ export const useStore = create<LayoutStateStore>((set, get) => ({
   updateWidgetSettings: (id: number, newSettings: WidgetSetting[]) => {
     const { currentLayout, originalLayout } = get();
     if (!currentLayout) return;
-    const newWidgets = currentLayout.widgets.map(widget =>
+    const newWidgets = currentLayout.widgets.map((widget) =>
       widget.id === id ? { ...widget, settings: newSettings } : widget
     );
     const originalWidgets = originalLayout?.widgets ?? [];
@@ -242,7 +269,34 @@ export const useStore = create<LayoutStateStore>((set, get) => ({
       hasLayoutChanged: changed,
     });
   },
-  
+
+  updateLayoutOnDashboard: async (id, onDashboard, user) => {
+    try {
+      const userId = user.id;
+      const response = await axios.patch("/api/v1/layouts", {
+        userId,
+        id,
+        onDashboard,
+      });
+      if (response.status === 200) {
+        set((state) => ({
+          layouts: state.layouts?.map((layout) =>
+            layout.id === id ? response.data : layout
+          ),
+          currentLayout:
+            state.currentLayout?.id === id
+              ? response.data
+              : state.currentLayout,
+          originalLayout:
+            state.originalLayout?.id === id
+              ? response.data
+              : state.originalLayout,
+        }));
+      }
+    } catch (error) {
+      console.error("Error updating layout dashboard status", error);
+    }
+  },
 
   createWidget: (widgetKey: WidgetValue) => {
     const { currentLayout, gridSize, originalLayout } = get();

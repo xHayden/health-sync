@@ -9,6 +9,8 @@ import {
 
 // GET: fetch all layouts for a user.
 export async function GET(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
+  console.log(authenticated);
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -19,7 +21,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const layouts = await getLayouts(Number(userId));
+    const layouts = await getLayouts(Number(userId), authenticated);
     return NextResponse.json({ data: layouts });
   } catch (error: any) {
     console.error("GET /api/v1/layouts error:", error);

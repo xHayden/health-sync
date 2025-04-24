@@ -34,7 +34,7 @@ import widgetRegistry from "@/lib/widgetRegistry";
 import { Widget } from "@/types/WidgetData";
 import WidgetDisplay from "./WidgetDisplay";
 import { Session } from "next-auth";
-import { useStore } from "@/lib/store/layoutStore";
+import { useLayoutStore } from "@/lib/store/layoutStore";
 
 export interface DraggableResizableWidgetProps {
   id: number;
@@ -220,7 +220,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
       return { ...setting, value: el.value };
     });
     const { updateWidgetSettings, currentLayout, saveLayout } =
-      useStore.getState();
+      useLayoutStore.getState();
     // @ts-ignore
     updateWidgetSettings(widget.id, newSettings);
     if (currentLayout) saveLayout(currentLayout.id, user);
@@ -229,6 +229,8 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
 
   type WidgetRegistryKeys = keyof typeof widgetRegistry;
   const meta = widgetRegistry[widget.type as WidgetRegistryKeys];
+
+  if (!user) return <></>;
 
   if (editMode) {
     return (
@@ -267,7 +269,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
             <DialogHeader>
               <DialogTitle>Confirm Removal</DialogTitle>
               <DialogDescription>
-                Are you sure you want to remove this widget?
+                Are you sure you want to remove this widget? This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

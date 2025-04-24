@@ -47,3 +47,94 @@ export const useDeleteLayout = (user: Session["user"]) => {
     },
   });
 };
+
+export const useSharedLayoutsByOwner = (
+  ownerId: number,
+  enabled: boolean = true
+) => {
+  return useQuery({
+    queryKey: ["sharedLayouts", "owner", ownerId],
+    queryFn: async () => {
+      const { data } = await axios.get(
+        `/api/v1/layouts/share?ownerId=${ownerId}`
+      );
+      return data.data;
+    },
+    enabled,
+  });
+};
+
+export const useSharedLayoutsForMember = (
+  memberId: number,
+  enabled: boolean = true
+) => {
+  return useQuery({
+    queryKey: ["sharedLayouts", "member", memberId],
+    queryFn: async () => {
+      const { data } = await axios.get(
+        `/api/v1/layouts/share?memberId=${memberId}`
+      );
+      return data.data;
+    },
+    enabled,
+  });
+};
+
+export const useShareLayout = (user: Session["user"]) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sharePayload: {
+      layoutId: number;
+      sharedUserId: number;
+      scopes?: Array<{
+        resourceType: string;
+        resourceId?: number;
+        permissions: string[];
+      }>;
+      expires?: string;
+    }) =>
+      axios.post("/api/v1/layouts/share", {
+        ownerId: user.id,
+        ...sharePayload,
+      }),
+    onSuccess: (_, __, context) => {
+      queryClient.invalidateQueries({
+        queryKey: ["sharedLayouts", "owner", user.id],
+      });
+    },
+  });
+};
+
+export const useUpdateSharedLayout = (user: Session["user"]) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (updatePayload: {
+      shareId: number;
+      expires?: string | null;
+      scopesToAdd?: Array<{
+        resourceType: string;
+        resourceId?: number;
+        permissions: string[];
+      }>;
+      scopesToRemove?: number[];
+    }) => axios.patch("/api/v1/layouts/share", updatePayload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["sharedLayouts", "owner", user.id],
+      });
+    },
+  });
+};
+
+export const useRevokeSharedLayout = (user: Session["user"]) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (shareId: number) =>
+      axios.delete(`/api/v1/layouts/share?shareId=${shareId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["sharedLayouts", "owner", user.id],
+      });
+    },
+  });
+};
