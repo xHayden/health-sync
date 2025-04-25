@@ -4,10 +4,10 @@ import { insertHealthData } from "@/utils/db";
 import { ResponseStatus } from "@/utils/requests";
 import { decode } from '@msgpack/msgpack';
 import { headers } from "next/headers";
-import { NextApiRequest } from 'next';
 import { HistoricalHealthData } from '@/types/HealthData';
 
 export async function POST(req: NextRequest) {
+  const authenticated = req.headers.get("x-user-owns-resource") === "true";
   try {
     const headersList = await headers();
     const contentEncoding = headersList.get("content-encoding");
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // If none of the above matched and you got here, assume it's JSON or return an error
     try {
       const jsonBody = JSON.parse(bodyBuffer.toString("utf-8"));
-      await insertHealthData(jsonBody);
+      await insertHealthData(jsonBody, authenticated);
       return NextResponse.json(ResponseStatus(true, "/api/v1/sync"), { status: 200 });
     } catch (e) {
       return NextResponse.json(

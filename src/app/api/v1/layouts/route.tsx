@@ -10,7 +10,6 @@ import {
 // GET: fetch all layouts for a user.
 export async function GET(request: Request) {
   const authenticated = request.headers.get("x-user-owns-resource") === "true";
-  console.log(authenticated);
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
@@ -34,6 +33,7 @@ export async function GET(request: Request) {
 
 // POST: create a new layout.
 export async function POST(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
   try {
     const body = await request.json();
     const { userId, ...layoutData } = body;
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newLayout = await createLayout(userId, layoutData);
+    const newLayout = await createLayout(userId, layoutData, authenticated);
     return NextResponse.json(newLayout, { status: 201 });
   } catch (error: any) {
     console.error("POST /api/v1/layouts error:", error);
@@ -58,6 +58,8 @@ export async function POST(request: Request) {
 
 // PATCH: update an existing layout.
 export async function PATCH(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
+
   try {
     const body = await request.json();
     const { userId, id, ...updateData } = body;
@@ -69,7 +71,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updatedLayout = await updateLayout(Number(userId), id, updateData);
+    const updatedLayout = await updateLayout(Number(userId), id, updateData, authenticated);
     return NextResponse.json(updatedLayout); 
   } catch (error: any) {
     console.error("PATCH /api/v1/layouts error:", error);
@@ -82,6 +84,8 @@ export async function PATCH(request: Request) {
 
 // DELETE: remove a layout.
 export async function DELETE(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -94,7 +98,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await deleteLayout(Number(userId), Number(id));
+    await deleteLayout(Number(userId), Number(id), authenticated);
     return NextResponse.json({ message: "Layout deleted successfully" });
   } catch (error: any) {
     console.error("DELETE /api/v1/layouts error:", error);

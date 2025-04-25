@@ -59,6 +59,7 @@ export async function POST(request: Request) {
 
 // PATCH: update an existing Counter.
 export async function PATCH(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
   try {
     const body = await request.json();
     const { userId, id, ...updateData } = body;
@@ -70,7 +71,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updatedCounter = await updateCounter(Number(userId), id, updateData);
+    const updatedCounter = await updateCounter(Number(userId), id, updateData, authenticated);
     return NextResponse.json(updatedCounter); 
   } catch (error: any) {
     console.error("PATCH /api/v1/counters error:", error);
@@ -83,6 +84,7 @@ export async function PATCH(request: Request) {
 
 // DELETE: remove a Counter.
 export async function DELETE(request: Request) {
+  const authenticated = request.headers.get("x-user-owns-resource") === "true";
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -95,7 +97,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await deleteCounter(Number(userId), Number(id));
+    await deleteCounter(Number(userId), Number(id), authenticated);
     return NextResponse.json({ message: "Counter deleted successfully" });
   } catch (error: any) {
     console.error("DELETE /api/v1/counters error:", error);

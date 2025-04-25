@@ -5,73 +5,54 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // 1. Public routes pass straight through
   if (pathname.startsWith("/login") || pathname.startsWith("/public")) {
     return NextResponse.next();
   }
 
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  // 2. Session check (Edge-compatible getToken)
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token) return NextResponse.redirect(new URL("/login", req.url));
 
-  // 3) clone headers so we can inject our flag
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-user-id', (token.id ?? '') as string);
-  // 4) resource-ownership check ONLY on /api/v1/* except /api/v1/users
+  // 3. Clone headers so we can mutate
+  const headers = new Headers(req.headers);
+  headers.set("x-user-id", String(token.id ?? ""));
+
+  // 4. Optional resource-ownership gate
   if (
     pathname.startsWith("/api/v1/") &&
     !pathname.startsWith("/api/v1/users")
   ) {
-    // use whichever claim holds your userId
-    const sessionUserId = token.id?.toString();
+    const sessionUserId = String(token.id ?? "");
+    let owns = true;
 
-    let owns = false;
-
-    // a) look for ?userId=...
-    const q = req.nextUrl.searchParams.get("userId");
-    if (q) {
-      owns = q === sessionUserId;
+    // 4a. Query-string check
+    const qsUserId = req.nextUrl.searchParams.get("userId");
+    if (qsUserId) {
+      owns = qsUserId === sessionUserId;
     }
-    // b) else, on non-GET requests, try to parse JSON body
+    // 4b. For non-GET, peek at JSON body **after cloning**
     else if (req.method !== "GET") {
       try {
-        const body = await req.json();
-        if (body?.userId) {
-          owns = body.userId.toString() === sessionUserId;
-        } else {
-          // no userId to check → default to true
-          owns = true;
-        }
+        const body = await req.clone().json();
+        owns = !body?.userId || body.userId.toString() === sessionUserId;
       } catch {
-        // if parse fails, play safe and deny
         owns = false;
       }
-    } else {
-      // GET with no userId param → OK
-      owns = true;
     }
+    headers.set("x-user-owns-resource", String(owns));
+  }
 
-    // inject a single source-of-truth header
-    requestHeaders.set("x-user-owns-resource", owns.toString());
-    }
-
-  // 5) forward the (possibly) modified request into your API/next handler
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  // 5. Forward the request with mutated headers
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
   matcher: [
-    // your old page matcher:
+    // pages
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
-    // + run on /api/v1/* except /api/v1/users
+    // api (except /api/v1/users)
     "/api/v1/:path((?!users).*)",
   ],
-  // runtime: 'nodejs'
 };
