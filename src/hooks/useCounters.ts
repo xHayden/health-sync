@@ -142,6 +142,11 @@ export function useCounters(userId: number, enabled: boolean) {
 
   const enqueueUpdate = (args: UpdateArgs) => {
     const { id, ...data } = args;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.warning("Offline: update queued", {
+        description: "We'll send your counter update when you're back online.",
+      });
+    }
     // Optimistic cache update immediately
     optimisticallyUpdateCache(id, data);
     // Enqueue request preserving order
@@ -153,6 +158,7 @@ export function useCounters(userId: number, enabled: boolean) {
 
   // Prevent page unload/navigation while there are pending queued updates
   useEffect(() => {
+    const OFFLINE_TOAST_ID = "offline-status";
     const handler = (e: BeforeUnloadEvent) => {
       if (pendingOps > 0) {
         e.preventDefault();
@@ -165,14 +171,19 @@ export function useCounters(userId: number, enabled: boolean) {
 
   // Show connectivity toasts
   useEffect(() => {
+    const OFFLINE_TOAST_ID = "offline-status";
     const onOffline = () =>
       toast.error("You are offline", {
-        description: "Queued updates may fail. Reconnect to continue.",
+        description: "Updates will queue and send when back online.",
+        id: OFFLINE_TOAST_ID,
+        duration: Infinity,
       });
-    const onOnline = () =>
+    const onOnline = () => {
+      toast.dismiss(OFFLINE_TOAST_ID);
       toast.success("Back online", {
-        description: "You can continue updating counters.",
+        description: "Queued updates will now be sent.",
       });
+    };
     window.addEventListener("offline", onOffline);
     window.addEventListener("online", onOnline);
     return () => {
