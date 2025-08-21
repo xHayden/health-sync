@@ -161,6 +161,7 @@ export function useCounters(userId: number, enabled: boolean) {
   // Public API: keep the same shape as a react-query mutation result for ease of use
   const updateCounter = {
     mutate: (args: UpdateArgs) => enqueueUpdate(args),
+    isPending: pendingOps > 0 || updateCounterMutation.isPending,
   } as const;
 
   const deleteCounter = useMutation({
