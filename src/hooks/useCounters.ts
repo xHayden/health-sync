@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 
 export interface Counter {
   id?: number;
@@ -64,7 +65,8 @@ export function useCounters(userId: number, enabled: boolean) {
     },
   });
 
-  const updateCounter = useMutation({
+  // Low-level mutation for actually calling the API
+  const updateCounterMutation = useMutation({
     mutationFn: ({
       id,
       ...data
@@ -74,6 +76,92 @@ export function useCounters(userId: number, enabled: boolean) {
       queryClient.invalidateQueries({ queryKey: ["counters", userId] });
     },
   });
+
+  // --- Optimistic, ordered, debounced queue ---
+  type UpdateArgs = { id: number } & Partial<Omit<Counter, "id">>;
+  const queuesRef = useRef<Map<number, UpdateArgs[]>>(new Map());
+  const flushingRef = useRef<Set<number>>(new Set());
+  const debouncersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [pendingOps, setPendingOps] = useState(0);
+
+  const getQueue = (id: number) => {
+    let q = queuesRef.current.get(id);
+    if (!q) {
+      q = [];
+      queuesRef.current.set(id, q);
+    }
+    return q;
+  };
+
+  const optimisticallyUpdateCache = (id: number, data: Partial<Omit<Counter, "id">>) => {
+    queryClient.setQueryData<Counter[] | undefined>(["counters", userId], (old) => {
+      if (!old) return old as any;
+      return old.map((c) => (c.id === id ? { ...c, ...data } : c));
+    });
+  };
+
+  const flushQueue = async (id: number) => {
+    if (flushingRef.current.has(id)) return;
+    flushingRef.current.add(id);
+    try {
+      const q = getQueue(id);
+      while (q.length > 0) {
+        const next = q.shift()!;
+        try {
+          await updateCounterMutation.mutateAsync(next);
+        } catch (e) {
+          // On error, refetch to reconcile and stop further sends for this id.
+          queryClient.invalidateQueries({ queryKey: ["counters", userId] });
+          const remaining = q.length;
+          q.length = 0;
+          setPendingOps((p) => Math.max(0, p - 1 - remaining));
+          break;
+        } finally {
+          setPendingOps((p) => Math.max(0, p - 1));
+        }
+      }
+    } finally {
+      flushingRef.current.delete(id);
+    }
+  };
+
+  const scheduleFlush = (id: number, delayMs: number) => {
+    const existing = debouncersRef.current.get(id);
+    if (existing) clearTimeout(existing);
+    const handle = setTimeout(() => {
+      debouncersRef.current.delete(id);
+      void flushQueue(id);
+    }, delayMs);
+    debouncersRef.current.set(id, handle);
+  };
+
+  const enqueueUpdate = (args: UpdateArgs) => {
+    const { id, ...data } = args;
+    // Optimistic cache update immediately
+    optimisticallyUpdateCache(id, data);
+    // Enqueue request preserving order
+    getQueue(id).push(args);
+    setPendingOps((p) => p + 1);
+    // Debounce flush to coalesce rapid clicks, but maintain ordering in the queue
+    scheduleFlush(id, 150);
+  };
+
+  // Prevent page unload/navigation while there are pending queued updates
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (pendingOps > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [pendingOps]);
+
+  // Public API: keep the same shape as a react-query mutation result for ease of use
+  const updateCounter = {
+    mutate: (args: UpdateArgs) => enqueueUpdate(args),
+  } as const;
 
   const deleteCounter = useMutation({
     mutationFn: (id: number) => deleteCounterApi(userId, id),

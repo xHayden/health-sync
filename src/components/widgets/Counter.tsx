@@ -24,14 +24,15 @@ const Counter: React.FC<CounterProps> = ({
   additionalHooks,
   settings,
 }) => {
-  const [selectedCounter, setSelectedCounter] = useState<CounterType | undefined>(
-    undefined
-  );
+  const [selectedCounter, setSelectedCounter] = useState<
+    CounterType | undefined
+  >(undefined);
   const dataSourceValue = settings.find((s) => s.key === "dataSource")?.value;
   const [needsDataSource, setNeedsDataSource] = useState(
     counters ? counters.length == 0 : true
   );
   const updateCounter = additionalHooks?.updateCounter;
+  const [optimisticValue, setOptimisticValue] = useState<number | null>(null);
 
   useEffect(() => {
     if (!dataSourceValue || !counters || counters.length == 0) {
@@ -41,21 +42,33 @@ const Counter: React.FC<CounterProps> = ({
     setSelectedCounter(counters.find((c) => c.id == dataSourceValue));
   }, [dataSourceValue, counters, selectedCounter]);
 
+  // Initialize or reconcile optimistic value from selected counter
+  useEffect(() => {
+    if (selectedCounter && optimisticValue == null) {
+      setOptimisticValue(selectedCounter.value);
+    }
+  }, [selectedCounter, optimisticValue]);
+
   const handleIncrement = (n: number = 1) => {
     if (!selectedCounter) return;
-    const newValue = selectedCounter.value + n;
+    const current = optimisticValue ?? selectedCounter.value;
+    const newValue = current + n;
+    setOptimisticValue(newValue);
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });
   };
 
   const handleDecrement = (n: number = 1) => {
     if (!selectedCounter) return;
-    const newValue = selectedCounter.value - n;
+    const current = optimisticValue ?? selectedCounter.value;
+    const newValue = current - n;
+    setOptimisticValue(newValue);
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });
   };
 
   const handleReset = () => {
     if (!selectedCounter) return;
     const newValue = 0;
+    setOptimisticValue(newValue);
     updateCounter.mutate({ id: selectedCounter.id, value: newValue });
   };
 
@@ -80,7 +93,7 @@ const Counter: React.FC<CounterProps> = ({
       <CardContent className="flex items-center justify-around my-6 gap-2 p-0">
         {!needsDataSource ? (
           <>
-                        <div className="flex flex-col gap-2 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
+            <div className="flex flex-col gap-2 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
               <Button
                 variant="outline"
                 size={"lg"}
@@ -105,7 +118,7 @@ const Counter: React.FC<CounterProps> = ({
               </Button>
             </div>
             <span className="text-8xl font-semibold">
-              {selectedCounter?.value}
+              {optimisticValue ?? selectedCounter?.value}
             </span>
             <div className="flex flex-col gap-4 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
               <Button
