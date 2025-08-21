@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 export interface Counter {
   id?: number;
@@ -74,6 +75,10 @@ export function useCounters(userId: number, enabled: boolean) {
       updateCounterApi(userId, id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["counters", userId] });
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Failed to update counter";
+      toast.error("Counter update failed", { description: message });
     },
   });
 
@@ -157,6 +162,24 @@ export function useCounters(userId: number, enabled: boolean) {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [pendingOps]);
+
+  // Show connectivity toasts
+  useEffect(() => {
+    const onOffline = () =>
+      toast.error("You are offline", {
+        description: "Queued updates may fail. Reconnect to continue.",
+      });
+    const onOnline = () =>
+      toast.success("Back online", {
+        description: "You can continue updating counters.",
+      });
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
 
   // Public API: keep the same shape as a react-query mutation result for ease of use
   const updateCounter = {
