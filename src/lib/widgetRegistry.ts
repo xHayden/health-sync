@@ -14,6 +14,7 @@ import React from "react";
 import WorkoutChart, { WorkoutChartProps } from "@/components/widgets/WorkoutChart";
 import { ActivityCalendar } from "@/components/widgets/ActivityCalendar";
 import Counter, { CounterProps } from "@/components/widgets/Counter";
+import MonthGraph, { MonthGraphProps } from "@/components/widgets/MonthGraph";
 import { DailyWorkoutSummary } from "@prisma/client";
 
 /**
@@ -27,7 +28,8 @@ export enum WidgetMetaDataTypes {
   WorkoutSummaries = "workoutSummaries",
   SleepSummaries = "sleepSummaries",
   ActivityDaysLevels = "activityDaysLevels",
-  Counters = "counters"
+  Counters = "counters",
+  CounterHistory = "counterHistory"
 }
 
 // -------------------
@@ -100,7 +102,7 @@ export interface WidgetMeta<
  *
  * When adding a new widget, add its unique key to this type union.
  */
-export type WidgetValue = "workoutChart" | "activityCalendar" | "counter";
+export type WidgetValue = "workoutChart" | "activityCalendar" | "counter" | "monthGraph";
 
 /**
  * The widgetRegistry maps widget keys to their corresponding metadata.
@@ -270,6 +272,93 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
     ],
     requiredData: [
       WidgetMetaDataTypes.Counters // todo, store this separately from widget data to allow as datasource
+    ],
+  },
+  monthGraph: {
+    name: "Month Graph",
+    description: "A chart showing counter data aggregated by months over time.",
+    component: MonthGraph,
+    dummyData: {
+      counterHistory: [
+        {
+          month: "2024-01",
+          totalChanges: 45,
+          netChange: 10,
+          startValue: 50,
+          endValue: 60,
+          changeCount: 15,
+          averageValue: 55,
+        },
+        {
+          month: "2024-02",
+          totalChanges: 38,
+          netChange: -5,
+          startValue: 60,
+          endValue: 55,
+          changeCount: 12,
+          averageValue: 58,
+        },
+        {
+          month: "2024-03",
+          totalChanges: 52,
+          netChange: 15,
+          startValue: 55,
+          endValue: 70,
+          changeCount: 18,
+          averageValue: 62,
+        },
+      ],
+    } as MonthGraphProps,
+    settings: [
+      {
+        key: "cardName",
+        label: "Widget Name",
+        type: "text",
+        defaultValue: "Month Graph",
+        description: "Name for the month graph widget.",
+      },
+      {
+        key: "dataSource",
+        type: "dropdown",
+        label: "Counter Data Source",
+        description: "Counter to display historical data for",
+        source: "counters"
+      },
+      {
+        key: "dateRange",
+        label: "Date Range (months)",
+        type: "number",
+        defaultValue: 12,
+        description: "Number of months to display in the chart"
+      },
+      {
+        key: "aggregationType",
+        label: "Aggregation Type",
+        type: "select",
+        options: [
+          { label: "Net Change", value: "net" },
+          { label: "Total Changes", value: "total" },
+          { label: "Average Value", value: "average" }
+        ],
+        defaultValue: "net",
+        description: "How to aggregate counter data for each month"
+      },
+      {
+        key: "chartType",
+        label: "Chart Type",
+        type: "select",
+        options: [
+          { label: "Bar Chart", value: "bar" },
+          { label: "Line Chart", value: "line" },
+          { label: "Area Chart", value: "area" }
+        ],
+        defaultValue: "bar",
+        description: "Visual style of the chart"
+      }
+    ],
+    requiredData: [
+      WidgetMetaDataTypes.Counters,
+      WidgetMetaDataTypes.CounterHistory
     ],
   },
   // To add a new widget, follow the pattern below:

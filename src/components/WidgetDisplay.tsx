@@ -33,6 +33,9 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
   const needsCounterData =
     required.includes(WidgetMetaDataTypes.Counters) &&
     widget.data[WidgetMetaDataTypes.Counters] == null;
+  const needsCounterHistoryData =
+    required.includes(WidgetMetaDataTypes.CounterHistory) &&
+    widget.data[WidgetMetaDataTypes.CounterHistory] == null;
 
   const {
     data: workoutData,
@@ -103,7 +106,7 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
       widgetType={widget.type}
       {...dataProps}
       settings={widget.settings}
-      additionalHooks={{ updateCounter } as AdditionalHooks}
+      additionalHooks={{ updateCounter, userId: user.id } as AdditionalHooks}
     />
   );
 }
@@ -111,5 +114,6 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
 export interface AdditionalHooks {
   updateCounter: UseMutationResult<Counter, Error, {
     id: number;
-} & Partial<Omit<Counter, "id">>, unknown>
+} & Partial<Omit<Counter, "id">>, unknown>;
+  userId: number;
 }

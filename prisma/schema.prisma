@@ -24,6 +24,7 @@ model User {
   sleepSessions            SleepSession[]
   layouts                  Layout[]
   counters                 Counter[]
+  counterHistory           CounterHistory[]
   sharedLayoutsWhereMember SharedLayout[]        @relation(name: "sharedUser")
   sharedLayoutsWhereOwner  SharedLayout[]        @relation(name: "owner")
 }
@@ -157,11 +158,25 @@ model Layout {
 }
 
 model Counter {
-  id     Int    @id @default(autoincrement())
-  userId Int
-  name   String
-  value  Int
-  user   User   @relation(fields: [userId], references: [id])
+  id      Int              @id @default(autoincrement())
+  userId  Int
+  name    String
+  value   Int
+  history CounterHistory[]
+  user    User             @relation(fields: [userId], references: [id])
+}
+
+model CounterHistory {
+  id        Int      @id @default(autoincrement())
+  counterId Int
+  userId    Int
+  value     Int
+  timestamp DateTime @default(now())
+  counter   Counter  @relation(fields: [counterId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([counterId, timestamp])
+  @@index([userId, timestamp])
 }
 
 enum PermissionType {

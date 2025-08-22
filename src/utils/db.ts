@@ -32,6 +32,8 @@ import {
   getCounterById,
   getCounters,
   updateCounter,
+  getCounterHistory,
+  getCounterMonthlyAggregates,
 } from "./db/counter";
 import {
   getSharedLayoutsForMember,
@@ -85,6 +87,8 @@ export {
   deleteCounter,
   updateCounter,
   createCounter,
+  getCounterHistory,
+  getCounterMonthlyAggregates,
   getSharedLayoutsForMember,
   getSharedLayoutsByOwner,
   updateSharedLayout,
