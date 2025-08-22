@@ -137,6 +137,30 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     });
   }, [dropdownSettings]);
 
+  /* Select settings & values */
+  const selectSettings = useMemo(
+    () => widget.settings.filter((s) => s.type === "select"),
+    [widget.settings]
+  );
+  const [selectValues, setSelectValues] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        selectSettings.map((s) => [
+          s.key,
+          (s.value ?? s.defaultValue ?? "").toString(),
+        ])
+      )
+  );
+  useEffect(() => {
+    setSelectValues((prev) => {
+      const next = { ...prev };
+      selectSettings.forEach((s) => {
+        if (!(s.key in next)) next[s.key] = (s.defaultValue ?? "").toString();
+      });
+      return next;
+    });
+  }, [selectSettings]);
+
   /* Resize handle */
   const resizeHandle = useMemo(
     () => (
@@ -205,6 +229,12 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
           value: dropdownValues[setting.key],
         } as typeof setting;
       }
+      if (setting.type === "select") {
+        return {
+          ...setting,
+          value: selectValues[setting.key],
+        } as typeof setting;
+      }
       const el = document.getElementById(
         setting.key
       ) as HTMLInputElement | null;
@@ -225,7 +255,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
     updateWidgetSettings(widget.id, newSettings);
     if (currentLayout) saveLayout(currentLayout.id, user);
     setOpenSettings(false);
-  }, [dropdownValues, widget, user]);
+  }, [dropdownValues, selectValues, widget, user]);
 
   type WidgetRegistryKeys = keyof typeof widgetRegistry;
   const meta = widgetRegistry[widget.type as WidgetRegistryKeys];
@@ -333,8 +363,12 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
 
                   {setting.type === "select" && (
                     <Select
-                      defaultValue={
-                        (setting.value ?? setting.defaultValue) as string
+                      value={selectValues[setting.key]}
+                      onValueChange={(val: string) =>
+                        setSelectValues((prev) => ({
+                          ...prev,
+                          [setting.key]: val,
+                        }))
                       }
                     >
                       <SelectTrigger id={setting.key}>

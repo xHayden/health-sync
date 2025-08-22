@@ -330,8 +330,8 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
         type: "select",
         options: [
           { label: "By Month", value: "month" },
-          { label: "By Day (7d)", value: "day" },
-          { label: "By Hour (24h)", value: "hour" }
+          { label: "By Day", value: "day" },
+          { label: "By Hour", value: "hour" }
         ],
         defaultValue: "month",
         description: "How to group the counter data over time"
@@ -341,7 +341,7 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
         label: "Time Range",
         type: "number",
         defaultValue: 12,
-        description: "Number of time periods to display (months: 1-120, days: 1-365, hours: 1-168)"
+        description: "Number of time periods to display (will auto-adjust based on grouping)"
       },
       {
         key: "aggregationType",

@@ -41,13 +41,50 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
   const [selectedCounter, setSelectedCounter] = useState<CounterType | undefined>(undefined);
   const [needsDataSource, setNeedsDataSource] = useState(true);
 
-  // Get settings values
-  const dataSourceValue = settings.find((s) => s.key === "dataSource")?.value;
-  const timeRange = Number(settings.find((s) => s.key === "timeRange")?.value) || 12;
-  const timeGrouping = (settings.find((s) => s.key === "timeGrouping")?.value as "month" | "day" | "hour") || "month";
-  const aggregationType = settings.find((s) => s.key === "aggregationType")?.value || "net";
-  const chartType = settings.find((s) => s.key === "chartType")?.value || "bar";
-  const cardName = settings.find((s) => s.key === "cardName")?.value || "Time Graph";
+  // Get settings values using the same pattern as the settings UI
+  const dataSourceSetting = settings.find((s) => s.key === "dataSource");
+  const dataSourceValue = dataSourceSetting?.value ?? dataSourceSetting?.defaultValue;
+  
+  const timeGroupingSetting = settings.find((s) => s.key === "timeGrouping");
+  const timeGrouping = (timeGroupingSetting?.value ?? timeGroupingSetting?.defaultValue ?? "month") as "month" | "day" | "hour";
+  
+  const timeRangeSetting = settings.find((s) => s.key === "timeRange");
+  const timeRangeValue = timeRangeSetting?.value ?? timeRangeSetting?.defaultValue;
+  const timeRange = timeRangeValue ? Number(timeRangeValue) : getDefaultTimeRange(timeGrouping);
+
+  const aggregationTypeSetting = settings.find((s) => s.key === "aggregationType");
+  const aggregationType = aggregationTypeSetting?.value ?? aggregationTypeSetting?.defaultValue ?? "net";
+  
+  const chartTypeSetting = settings.find((s) => s.key === "chartType");
+  const chartType = chartTypeSetting?.value ?? chartTypeSetting?.defaultValue ?? "bar";
+  
+  const cardNameSetting = settings.find((s) => s.key === "cardName");
+  const cardName = cardNameSetting?.value ?? cardNameSetting?.defaultValue ?? "Time Graph";
+
+  // Debug logging
+  console.log("MonthGraph settings debug:", {
+    dataSourceValue,
+    timeGrouping,
+    timeRange,
+    aggregationType,
+    chartType,
+    cardName,
+    allSettings: settings.map(s => ({ key: s.key, value: s.value, defaultValue: s.defaultValue }))
+  });
+
+  // Helper function to get appropriate default time ranges
+  function getDefaultTimeRange(groupBy: string): number {
+    switch (groupBy) {
+      case "month":
+        return 12;
+      case "day":
+        return 30;
+      case "hour":
+        return 24;
+      default:
+        return 12;
+    }
+  }
 
   // Set up selected counter based on data source setting
   useEffect(() => {
@@ -62,6 +99,16 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
 
   // Fetch historical data for the selected counter
   const userId = additionalHooks?.userId;
+  
+  // Debug the API call parameters
+  console.log("API call parameters:", {
+    userId: userId || 0,
+    counterId: selectedCounter?.id || 0,
+    timeGrouping,
+    timeRange,
+    enabled: !!selectedCounter && !!userId
+  });
+  
   const { timeData, isLoading, error } = useCounterTimeAggregatedDataHook(
     userId || 0,
     selectedCounter?.id || 0,

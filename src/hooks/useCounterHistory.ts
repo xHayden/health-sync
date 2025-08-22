@@ -52,21 +52,27 @@ async function fetchCounterHistory(
   return json.data ?? [];
 }
 
+// Deprecated: Use fetchCounterTimeAggregatedData instead
 async function fetchCounterMonthlyData(
   userId: number,
   counterId: number,
   monthsBack: number = 12
 ): Promise<MonthlyCounterData[]> {
-  const url = new URL("/api/v1/counters/monthly", window.location.origin);
-  url.searchParams.set("userId", userId.toString());
-  url.searchParams.set("counterId", counterId.toString());
-  url.searchParams.set("monthsBack", monthsBack.toString());
-
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error("Error fetching monthly counter data");
+  console.warn('fetchCounterMonthlyData is deprecated. Use fetchCounterTimeAggregatedData instead.');
   
-  const json = await res.json();
-  return json.data ?? [];
+  // Use the new aggregated API instead
+  const result = await fetchCounterTimeAggregatedData(userId, counterId, "month", monthsBack);
+  
+  // Convert to old format for backward compatibility
+  return result.map(data => ({
+    month: data.period,
+    totalChanges: data.totalChanges,
+    netChange: data.netChange,
+    startValue: data.startValue,
+    endValue: data.endValue,
+    changeCount: data.changeCount,
+    averageValue: data.averageValue,
+  }));
 }
 
 async function fetchCounterTimeAggregatedData(
@@ -81,10 +87,17 @@ async function fetchCounterTimeAggregatedData(
   url.searchParams.set("groupBy", groupBy);
   url.searchParams.set("timeRange", timeRange.toString());
 
+  console.log("Fetching counter data from:", url.toString());
+  
   const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Error fetching ${groupBy} counter data`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`API Error ${res.status}:`, errorText);
+    throw new Error(`Error fetching ${groupBy} counter data: ${res.status} ${errorText}`);
+  }
   
   const json = await res.json();
+  console.log("API Response:", json);
   return json.data ?? [];
 }
 
@@ -102,12 +115,14 @@ export function useCounterHistory(
   });
 }
 
+// Deprecated: Use useCounterTimeAggregatedData instead
 export function useCounterMonthlyData(
   userId: number,
   counterId: number,
   monthsBack: number = 12,
   enabled: boolean = true
 ) {
+  console.warn('useCounterMonthlyData is deprecated. Use useCounterTimeAggregatedData instead.');
   return useQuery({
     queryKey: ["counterMonthly", userId, counterId, monthsBack],
     queryFn: () => fetchCounterMonthlyData(userId, counterId, monthsBack),
@@ -143,13 +158,14 @@ export interface CounterTimeAggregatedHook {
   refetch: () => void;
 }
 
-// Main hook that combines monthly data fetching with loading states (backward compatibility)
+// Deprecated: Use useCounterTimeAggregatedDataHook instead
 export function useCounterHistoryData(
   userId: number,
   counterId: number,
   monthsBack: number = 12,
   enabled: boolean = true
 ): CounterHistoryHook {
+  console.warn('useCounterHistoryData is deprecated. Use useCounterTimeAggregatedDataHook instead.');
   const query = useCounterMonthlyData(userId, counterId, monthsBack, enabled);
 
   return {

@@ -367,7 +367,7 @@ function fillMissingPeriods(
   return result;
 }
 
-// Keep the old function for backward compatibility
+// Deprecated: Use getCounterTimeAggregates with groupBy: "month" instead
 export async function getCounterMonthlyAggregates(
   counterId: number,
   userId: number,
@@ -376,6 +376,7 @@ export async function getCounterMonthlyAggregates(
   shareToken?: string | null,
   sessionUserId?: number | null
 ) {
+  console.warn('getCounterMonthlyAggregates is deprecated. Use getCounterTimeAggregates with groupBy: "month" instead.');
   const result = await getCounterTimeAggregates(
     counterId, 
     userId, 
