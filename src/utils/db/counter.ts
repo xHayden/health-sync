@@ -220,12 +220,13 @@ export async function getCounterHistory(
 }
 
 /**
- * Get monthly aggregated counter data for a specific counter.
+ * Get time-grouped aggregated counter data for a specific counter.
  */
-export async function getCounterMonthlyAggregates(
+export async function getCounterTimeAggregates(
   counterId: number,
   userId: number,
-  monthsBack: number = 12,
+  groupBy: "month" | "day" | "hour",
+  timeRange: number,
   authenticated?: boolean,
   shareToken?: string | null,
   sessionUserId?: number | null
@@ -243,10 +244,20 @@ export async function getCounterMonthlyAggregates(
       throw new PermissionError(resourceArgs);
   }
 
-  const startDate = new Date();
-  startDate.setMonth(startDate.getMonth() - monthsBack);
-  startDate.setDate(1);
-  startDate.setHours(0, 0, 0, 0);
+  const now = new Date();
+  let startDate: Date;
+
+  // Calculate start date based on groupBy and timeRange
+  if (groupBy === "month") {
+    startDate = new Date(now.getFullYear(), now.getMonth() - timeRange + 1, 1);
+  } else if (groupBy === "day") {
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - timeRange + 1);
+    startDate.setHours(0, 0, 0, 0);
+  } else { // hour
+    startDate = new Date(now);
+    startDate.setHours(startDate.getHours() - timeRange + 1, 0, 0, 0);
+  }
 
   // Get all history entries for the time period
   const history = await getCounterHistory(
@@ -259,9 +270,9 @@ export async function getCounterMonthlyAggregates(
     sessionUserId
   );
 
-  // Group by month and calculate aggregates
-  const monthlyData = new Map<string, {
-    month: string;
+  // Group by time period and calculate aggregates
+  const timeData = new Map<string, {
+    period: string;
     changes: number[];
     firstValue?: number;
     lastValue?: number;
@@ -269,35 +280,120 @@ export async function getCounterMonthlyAggregates(
   }>();
 
   history.forEach((entry) => {
-    const monthKey = entry.timestamp.toISOString().substring(0, 7); // "YYYY-MM"
+    let periodKey: string;
     
-    if (!monthlyData.has(monthKey)) {
-      monthlyData.set(monthKey, {
-        month: monthKey,
+    if (groupBy === "month") {
+      periodKey = entry.timestamp.toISOString().substring(0, 7); // "YYYY-MM"
+    } else if (groupBy === "day") {
+      periodKey = entry.timestamp.toISOString().substring(0, 10); // "YYYY-MM-DD"
+    } else { // hour
+      periodKey = entry.timestamp.toISOString().substring(0, 13); // "YYYY-MM-DDTHH"
+    }
+    
+    if (!timeData.has(periodKey)) {
+      timeData.set(periodKey, {
+        period: periodKey,
         changes: [],
         changeCount: 0,
       });
     }
 
-    const monthData = monthlyData.get(monthKey)!;
-    monthData.changes.push(entry.value);
-    monthData.changeCount++;
+    const data = timeData.get(periodKey)!;
+    data.changes.push(entry.value);
+    data.changeCount++;
     
-    if (!monthData.firstValue) {
-      monthData.firstValue = entry.value;
+    if (!data.firstValue) {
+      data.firstValue = entry.value;
     }
-    monthData.lastValue = entry.value;
+    data.lastValue = entry.value;
   });
 
+  // Fill in missing periods with zero data
+  const filledData = fillMissingPeriods(timeData, startDate, now, groupBy);
+
   // Convert to array and calculate derived values
-  return Array.from(monthlyData.values()).map((data) => ({
-    month: data.month,
-    totalChanges: data.changes.reduce((sum, val) => sum + Math.abs(val - (data.firstValue || 0)), 0),
+  return filledData.map((data) => ({
+    period: data.period,
+    totalChanges: data.changes.reduce((sum: number, val: number) => sum + Math.abs(val - (data.firstValue || 0)), 0),
     netChange: (data.lastValue || 0) - (data.firstValue || 0),
     startValue: data.firstValue || 0,
     endValue: data.lastValue || 0,
     changeCount: data.changeCount,
     averageValue: data.changes.length > 0 ? 
-      data.changes.reduce((sum, val) => sum + val, 0) / data.changes.length : 0,
-  })).sort((a, b) => a.month.localeCompare(b.month));
+      data.changes.reduce((sum: number, val: number) => sum + val, 0) / data.changes.length : 0,
+  })).sort((a, b) => a.period.localeCompare(b.period));
+}
+
+/**
+ * Fill in missing time periods with zero data for consistent charting
+ */
+function fillMissingPeriods(
+  timeData: Map<string, any>,
+  startDate: Date,
+  endDate: Date,
+  groupBy: "month" | "day" | "hour"
+): any[] {
+  const result: any[] = [];
+  const current = new Date(startDate);
+
+  while (current <= endDate) {
+    let periodKey: string;
+    
+    if (groupBy === "month") {
+      periodKey = current.toISOString().substring(0, 7);
+      current.setMonth(current.getMonth() + 1);
+    } else if (groupBy === "day") {
+      periodKey = current.toISOString().substring(0, 10);
+      current.setDate(current.getDate() + 1);
+    } else { // hour
+      periodKey = current.toISOString().substring(0, 13);
+      current.setHours(current.getHours() + 1);
+    }
+
+    const existingData = timeData.get(periodKey);
+    if (existingData) {
+      result.push(existingData);
+    } else {
+      result.push({
+        period: periodKey,
+        changes: [],
+        firstValue: 0,
+        lastValue: 0,
+        changeCount: 0,
+      });
+    }
+  }
+
+  return result;
+}
+
+// Keep the old function for backward compatibility
+export async function getCounterMonthlyAggregates(
+  counterId: number,
+  userId: number,
+  monthsBack: number = 12,
+  authenticated?: boolean,
+  shareToken?: string | null,
+  sessionUserId?: number | null
+) {
+  const result = await getCounterTimeAggregates(
+    counterId, 
+    userId, 
+    "month", 
+    monthsBack, 
+    authenticated, 
+    shareToken, 
+    sessionUserId
+  );
+  
+  // Convert to old format for backward compatibility
+  return result.map(data => ({
+    month: data.period,
+    totalChanges: data.totalChanges,
+    netChange: data.netChange,
+    startValue: data.startValue,
+    endValue: data.endValue,
+    changeCount: data.changeCount,
+    averageValue: data.averageValue,
+  }));
 }

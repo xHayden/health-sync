@@ -275,8 +275,8 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
     ],
   },
   monthGraph: {
-    name: "Month Graph",
-    description: "A chart showing counter data aggregated by months over time.",
+    name: "Time Graph",
+    description: "A chart showing counter data aggregated by time periods (months, days, or hours).",
     component: MonthGraph,
     dummyData: {
       counterHistory: [
@@ -314,8 +314,8 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
         key: "cardName",
         label: "Widget Name",
         type: "text",
-        defaultValue: "Month Graph",
-        description: "Name for the month graph widget.",
+        defaultValue: "Time Graph",
+        description: "Name for the time graph widget.",
       },
       {
         key: "dataSource",
@@ -325,11 +325,23 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
         source: "counters"
       },
       {
-        key: "dateRange",
-        label: "Date Range (months)",
+        key: "timeGrouping",
+        label: "Time Grouping",
+        type: "select",
+        options: [
+          { label: "By Month", value: "month" },
+          { label: "By Day (7d)", value: "day" },
+          { label: "By Hour (24h)", value: "hour" }
+        ],
+        defaultValue: "month",
+        description: "How to group the counter data over time"
+      },
+      {
+        key: "timeRange",
+        label: "Time Range",
         type: "number",
         defaultValue: 12,
-        description: "Number of months to display in the chart"
+        description: "Number of time periods to display (months: 1-120, days: 1-365, hours: 1-168)"
       },
       {
         key: "aggregationType",

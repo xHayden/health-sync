@@ -1,7 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
 export interface MonthlyCounterData {
-  month: string; // "YYYY-MM"
+  month: string; // "YYYY-MM" - kept for backward compatibility
+  totalChanges: number;
+  netChange: number;
+  startValue: number;
+  endValue: number;
+  changeCount: number;
+  averageValue: number;
+}
+
+export interface TimeAggregatedData {
+  period: string; // "YYYY-MM", "YYYY-MM-DD", or "YYYY-MM-DDTHH"
   totalChanges: number;
   netChange: number;
   startValue: number;
@@ -59,6 +69,25 @@ async function fetchCounterMonthlyData(
   return json.data ?? [];
 }
 
+async function fetchCounterTimeAggregatedData(
+  userId: number,
+  counterId: number,
+  groupBy: "month" | "day" | "hour",
+  timeRange: number
+): Promise<TimeAggregatedData[]> {
+  const url = new URL("/api/v1/counters/aggregated", window.location.origin);
+  url.searchParams.set("userId", userId.toString());
+  url.searchParams.set("counterId", counterId.toString());
+  url.searchParams.set("groupBy", groupBy);
+  url.searchParams.set("timeRange", timeRange.toString());
+
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error(`Error fetching ${groupBy} counter data`);
+  
+  const json = await res.json();
+  return json.data ?? [];
+}
+
 export function useCounterHistory(
   userId: number,
   counterId: number,
@@ -86,6 +115,20 @@ export function useCounterMonthlyData(
   });
 }
 
+export function useCounterTimeAggregatedData(
+  userId: number,
+  counterId: number,
+  groupBy: "month" | "day" | "hour",
+  timeRange: number,
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: ["counterTimeAggregated", userId, counterId, groupBy, timeRange],
+    queryFn: () => fetchCounterTimeAggregatedData(userId, counterId, groupBy, timeRange),
+    enabled: !!userId && !!counterId && enabled,
+  });
+}
+
 export interface CounterHistoryHook {
   monthlyData: MonthlyCounterData[];
   isLoading: boolean;
@@ -93,7 +136,14 @@ export interface CounterHistoryHook {
   refetch: () => void;
 }
 
-// Main hook that combines monthly data fetching with loading states
+export interface CounterTimeAggregatedHook {
+  timeData: TimeAggregatedData[];
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => void;
+}
+
+// Main hook that combines monthly data fetching with loading states (backward compatibility)
 export function useCounterHistoryData(
   userId: number,
   counterId: number,
@@ -104,6 +154,24 @@ export function useCounterHistoryData(
 
   return {
     monthlyData: query.data ?? [],
+    isLoading: query.isLoading,
+    error: query.error as Error | null,
+    refetch: query.refetch,
+  };
+}
+
+// New main hook for flexible time aggregation
+export function useCounterTimeAggregatedDataHook(
+  userId: number,
+  counterId: number,
+  groupBy: "month" | "day" | "hour",
+  timeRange: number,
+  enabled: boolean = true
+): CounterTimeAggregatedHook {
+  const query = useCounterTimeAggregatedData(userId, counterId, groupBy, timeRange, enabled);
+
+  return {
+    timeData: query.data ?? [],
     isLoading: query.isLoading,
     error: query.error as Error | null,
     refetch: query.refetch,

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { WidgetSetting } from "@/lib/widgetRegistry";
 import { AdditionalHooks } from "../WidgetDisplay";
-import { MonthlyCounterData, useCounterHistoryData } from "@/hooks/useCounterHistory";
+import { MonthlyCounterData, TimeAggregatedData, useCounterTimeAggregatedDataHook } from "@/hooks/useCounterHistory";
 import { Counter as CounterType } from "@prisma/client";
 import {
   BarChart,
@@ -27,7 +27,7 @@ import {
 
 export interface MonthGraphProps {
   counters: CounterType[];
-  counterHistory: MonthlyCounterData[];
+  counterHistory: MonthlyCounterData[]; // Keep for backward compatibility
   additionalHooks: AdditionalHooks;
   settings: WidgetSetting[];
 }
@@ -43,10 +43,11 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
 
   // Get settings values
   const dataSourceValue = settings.find((s) => s.key === "dataSource")?.value;
-  const dateRange = Number(settings.find((s) => s.key === "dateRange")?.value) || 12;
+  const timeRange = Number(settings.find((s) => s.key === "timeRange")?.value) || 12;
+  const timeGrouping = (settings.find((s) => s.key === "timeGrouping")?.value as "month" | "day" | "hour") || "month";
   const aggregationType = settings.find((s) => s.key === "aggregationType")?.value || "net";
   const chartType = settings.find((s) => s.key === "chartType")?.value || "bar";
-  const cardName = settings.find((s) => s.key === "cardName")?.value || "Month Graph";
+  const cardName = settings.find((s) => s.key === "cardName")?.value || "Time Graph";
 
   // Set up selected counter based on data source setting
   useEffect(() => {
@@ -61,18 +62,19 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
 
   // Fetch historical data for the selected counter
   const userId = additionalHooks?.userId;
-  const { monthlyData, isLoading, error } = useCounterHistoryData(
+  const { timeData, isLoading, error } = useCounterTimeAggregatedDataHook(
     userId || 0,
     selectedCounter?.id || 0,
-    dateRange,
+    timeGrouping,
+    timeRange,
     !!selectedCounter && !!userId
   );
 
   // Prepare chart data based on aggregation type
   const chartData = useMemo(() => {
-    if (!monthlyData || monthlyData.length === 0) return [];
+    if (!timeData || timeData.length === 0) return [];
 
-    return monthlyData.map((data) => {
+    return timeData.map((data) => {
       let value: number;
       switch (aggregationType) {
         case "total":
@@ -87,16 +89,33 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
           break;
       }
 
-      return {
-        monthLabel: new Date(data.month + "-01").toLocaleDateString("en-US", {
+      // Format the period label based on grouping type
+      let periodLabel: string;
+      if (timeGrouping === "month") {
+        periodLabel = new Date(data.period + "-01").toLocaleDateString("en-US", {
           month: "short",
           year: "2-digit",
-        }),
+        });
+      } else if (timeGrouping === "day") {
+        periodLabel = new Date(data.period).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      } else { // hour
+        const hourDate = new Date(data.period + ":00:00.000Z");
+        periodLabel = hourDate.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          hour12: true,
+        });
+      }
+
+      return {
+        periodLabel,
         value,
         ...data,
       };
     });
-  }, [monthlyData, aggregationType]);
+  }, [timeData, aggregationType, timeGrouping]);
 
   // Chart component selection
   const renderChart = () => {
@@ -115,7 +134,7 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
         return (
           <LineChart {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="monthLabel" />
+            <XAxis dataKey="periodLabel" />
             <YAxis />
             <Tooltip 
               formatter={(value: number) => [value, getAggregationLabel()]}
@@ -128,7 +147,7 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
         return (
           <AreaChart {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="monthLabel" />
+            <XAxis dataKey="periodLabel" />
             <YAxis />
             <Tooltip 
               formatter={(value: number) => [value, getAggregationLabel()]}
@@ -142,7 +161,7 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
         return (
           <BarChart {...chartProps}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="monthLabel" />
+            <XAxis dataKey="periodLabel" />
             <YAxis />
             <Tooltip 
               formatter={(value: number) => [value, getAggregationLabel()]}
@@ -225,7 +244,7 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
         <CardTitle>{cardName}</CardTitle>
         {selectedCounter && (
           <p className="text-sm text-gray-600">
-            {selectedCounter.name} - {getAggregationLabel()} over {dateRange} months
+            {selectedCounter.name} - {getAggregationLabel()} over {timeRange} {timeGrouping}s
           </p>
         )}
       </CardHeader>
