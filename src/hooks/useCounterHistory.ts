@@ -87,8 +87,6 @@ async function fetchCounterTimeAggregatedData(
   url.searchParams.set("groupBy", groupBy);
   url.searchParams.set("timeRange", timeRange.toString());
 
-  console.log("Fetching counter data from:", url.toString());
-  
   const res = await fetch(url.toString());
   if (!res.ok) {
     const errorText = await res.text();
@@ -97,7 +95,6 @@ async function fetchCounterTimeAggregatedData(
   }
   
   const json = await res.json();
-  console.log("API Response:", json);
   return json.data ?? [];
 }
 
@@ -185,6 +182,7 @@ export function useCounterTimeAggregatedDataHook(
   enabled: boolean = true
 ): CounterTimeAggregatedHook {
   const query = useCounterTimeAggregatedData(userId, counterId, groupBy, timeRange, enabled);
+
 
   return {
     timeData: query.data ?? [],

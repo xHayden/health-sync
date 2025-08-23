@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCounterTimeAggregates } from "@/utils/db";
+import { getCounterTimeAggregates } from "@/utils/db/counter";
 
 // GET: fetch time-aggregated counter data for a specific counter
 export async function GET(request: Request) {

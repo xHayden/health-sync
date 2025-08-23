@@ -246,25 +246,39 @@ export async function getCounterTimeAggregates(
 
   const now = new Date();
   let startDate: Date;
+  let endDate: Date;
 
-  // Calculate start date based on groupBy and timeRange
+  // Calculate start and end dates based on groupBy and timeRange
+  // Always include the current period (day/month/hour) plus (timeRange-1) previous periods
   if (groupBy === "month") {
-    startDate = new Date(now.getFullYear(), now.getMonth() - timeRange + 1, 1);
+    // Start from the first day of the month that is (timeRange-1) months before current month
+    startDate = new Date(now.getFullYear(), now.getMonth() - (timeRange - 1), 1, 0, 0, 0, 0);
+    // End at the last moment of the current month to include the full current month
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   } else if (groupBy === "day") {
+    // Start from 00:00:00 of the day that is (timeRange-1) days before today
     startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - timeRange + 1);
+    startDate.setDate(startDate.getDate() - (timeRange - 1));
     startDate.setHours(0, 0, 0, 0);
+    // End at 23:59:59 of today to include the full current day
+    endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
   } else { // hour
+    // Start from the beginning of the hour that is (timeRange-1) hours before current hour
     startDate = new Date(now);
-    startDate.setHours(startDate.getHours() - timeRange + 1, 0, 0, 0);
+    startDate.setHours(startDate.getHours() - (timeRange - 1), 0, 0, 0);
+    // End at the end of the current hour to include the full current hour
+    endDate = new Date(now);
+    endDate.setMinutes(59, 59, 999);
   }
+
 
   // Get all history entries for the time period
   const history = await getCounterHistory(
     counterId, 
     userId, 
     startDate, 
-    undefined, 
+    endDate, 
     authenticated, 
     shareToken, 
     sessionUserId
@@ -274,12 +288,16 @@ export async function getCounterTimeAggregates(
   const timeData = new Map<string, {
     period: string;
     changes: number[];
-    firstValue?: number;
-    lastValue?: number;
+    startValue?: number;
+    endValue?: number;
     changeCount: number;
   }>();
 
-  history.forEach((entry) => {
+  // Sort history by timestamp to ensure proper chronological order
+  const sortedHistory = history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  // Group entries by period and collect all changes for each period
+  sortedHistory.forEach((entry) => {
     let periodKey: string;
     
     if (groupBy === "month") {
@@ -301,27 +319,98 @@ export async function getCounterTimeAggregates(
     const data = timeData.get(periodKey)!;
     data.changes.push(entry.value);
     data.changeCount++;
-    
-    if (!data.firstValue) {
-      data.firstValue = entry.value;
-    }
-    data.lastValue = entry.value;
   });
 
+  // Get current counter value 
+  const counter = await DBAdapter.getPrismaClient().counter.findFirst({
+    where: { id: counterId, userId }
+  });
+  const currentValue = counter?.value || 0;
+
+  // Calculate start/end values for each period by working chronologically
+  const periods = Array.from(timeData.keys()).sort();
+  let previousEndValue: number | null = null;
+  
+  for (const periodKey of periods) {
+    const data = timeData.get(periodKey)!;
+    
+    if (data.changes.length > 0) {
+      // Start value: either the end value from previous period, or look up historical data
+      if (previousEndValue !== null) {
+        data.startValue = previousEndValue;
+      } else {
+        // This is the first period with changes - look up what came before
+        let periodStartDate: Date;
+        if (groupBy === "day") {
+          periodStartDate = new Date(periodKey + "T00:00:00.000Z");
+        } else if (groupBy === "hour") {
+          periodStartDate = new Date(periodKey + ":00:00.000Z");
+        } else { // month
+          periodStartDate = new Date(periodKey + "-01T00:00:00.000Z");
+        }
+        
+        const previousEntry = await DBAdapter.getPrismaClient().counterHistory.findFirst({
+          where: {
+            counterId,
+            userId,
+            timestamp: { lt: periodStartDate }
+          },
+          orderBy: { timestamp: 'desc' }
+        });
+        
+        data.startValue = previousEntry?.value || 0;
+      }
+      
+      // End value: last change in this period, or current value if this is today
+      const today = new Date().toISOString().substring(0, 10);
+      const currentHour = new Date().toISOString().substring(0, 13);
+      const currentMonth = new Date().toISOString().substring(0, 7);
+      
+      const isCurrentPeriod = (groupBy === "day" && periodKey === today) ||
+                             (groupBy === "hour" && periodKey === currentHour) ||
+                             (groupBy === "month" && periodKey === currentMonth);
+      
+      if (isCurrentPeriod) {
+        data.endValue = currentValue;
+      } else {
+        data.endValue = data.changes[data.changes.length - 1];
+      }
+      
+      // Update for next iteration
+      previousEndValue = data.endValue;
+    } else {
+      // No changes in this period
+      if (previousEndValue !== null) {
+        data.startValue = previousEndValue;
+        data.endValue = previousEndValue;
+      } else {
+        data.startValue = 0;
+        data.endValue = 0;
+      }
+    }
+  }
+
   // Fill in missing periods with zero data
-  const filledData = fillMissingPeriods(timeData, startDate, now, groupBy);
+  const filledData = fillMissingPeriods(timeData, startDate, endDate, groupBy);
+
 
   // Convert to array and calculate derived values
-  return filledData.map((data) => ({
-    period: data.period,
-    totalChanges: data.changes.reduce((sum: number, val: number) => sum + Math.abs(val - (data.firstValue || 0)), 0),
-    netChange: (data.lastValue || 0) - (data.firstValue || 0),
-    startValue: data.firstValue || 0,
-    endValue: data.lastValue || 0,
-    changeCount: data.changeCount,
-    averageValue: data.changes.length > 0 ? 
-      data.changes.reduce((sum: number, val: number) => sum + val, 0) / data.changes.length : 0,
-  })).sort((a, b) => a.period.localeCompare(b.period));
+  const result = filledData.map((data) => {
+    const netChange = (data.endValue || 0) - (data.startValue || 0);
+    
+    return {
+      period: data.period,
+      totalChanges: data.changes.reduce((sum: number, val: number) => sum + Math.abs(val - (data.startValue || 0)), 0),
+      netChange,
+      startValue: data.startValue || 0,
+      endValue: data.endValue || 0,
+      changeCount: data.changeCount,
+      averageValue: data.changes.length > 0 ? 
+        data.changes.reduce((sum: number, val: number) => sum + val, 0) / data.changes.length : 0,
+    };
+  }).sort((a, b) => a.period.localeCompare(b.period));
+
+  return result;
 }
 
 /**
@@ -340,14 +429,11 @@ function fillMissingPeriods(
     let periodKey: string;
     
     if (groupBy === "month") {
-      periodKey = current.toISOString().substring(0, 7);
-      current.setMonth(current.getMonth() + 1);
+      periodKey = current.toISOString().substring(0, 7); // "YYYY-MM"
     } else if (groupBy === "day") {
-      periodKey = current.toISOString().substring(0, 10);
-      current.setDate(current.getDate() + 1);
+      periodKey = current.toISOString().substring(0, 10); // "YYYY-MM-DD"
     } else { // hour
-      periodKey = current.toISOString().substring(0, 13);
-      current.setHours(current.getHours() + 1);
+      periodKey = current.toISOString().substring(0, 13); // "YYYY-MM-DDTHH"
     }
 
     const existingData = timeData.get(periodKey);
@@ -357,10 +443,19 @@ function fillMissingPeriods(
       result.push({
         period: periodKey,
         changes: [],
-        firstValue: 0,
-        lastValue: 0,
+        startValue: 0,
+        endValue: 0,
         changeCount: 0,
       });
+    }
+    
+    // Increment after processing the current period
+    if (groupBy === "month") {
+      current.setMonth(current.getMonth() + 1);
+    } else if (groupBy === "day") {
+      current.setDate(current.getDate() + 1);
+    } else { // hour
+      current.setHours(current.getHours() + 1);
     }
   }
 

@@ -61,16 +61,6 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
   const cardNameSetting = settings.find((s) => s.key === "cardName");
   const cardName = cardNameSetting?.value ?? cardNameSetting?.defaultValue ?? "Time Graph";
 
-  // Debug logging
-  console.log("MonthGraph settings debug:", {
-    dataSourceValue,
-    timeGrouping,
-    timeRange,
-    aggregationType,
-    chartType,
-    cardName,
-    allSettings: settings.map(s => ({ key: s.key, value: s.value, defaultValue: s.defaultValue }))
-  });
 
   // Helper function to get appropriate default time ranges
   function getDefaultTimeRange(groupBy: string): number {
@@ -100,14 +90,6 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
   // Fetch historical data for the selected counter
   const userId = additionalHooks?.userId;
   
-  // Debug the API call parameters
-  console.log("API call parameters:", {
-    userId: userId || 0,
-    counterId: selectedCounter?.id || 0,
-    timeGrouping,
-    timeRange,
-    enabled: !!selectedCounter && !!userId
-  });
   
   const { timeData, isLoading, error } = useCounterTimeAggregatedDataHook(
     userId || 0,
@@ -117,11 +99,14 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
     !!selectedCounter && !!userId
   );
 
+
   // Prepare chart data based on aggregation type
   const chartData = useMemo(() => {
-    if (!timeData || timeData.length === 0) return [];
-
-    return timeData.map((data) => {
+    if (!timeData || timeData.length === 0) {
+      return [];
+    }
+    
+    const result = timeData.map((data) => {
       let value: number;
       switch (aggregationType) {
         case "total":
@@ -144,7 +129,9 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
           year: "2-digit",
         });
       } else if (timeGrouping === "day") {
-        periodLabel = new Date(data.period).toLocaleDateString("en-US", {
+        // Add explicit time to avoid timezone issues
+        const dateObj = new Date(data.period + "T12:00:00");
+        periodLabel = dateObj.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
         });
@@ -162,6 +149,9 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
         ...data,
       };
     });
+    
+    
+    return result;
   }, [timeData, aggregationType, timeGrouping]);
 
   // Chart component selection
@@ -169,6 +159,7 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
     const chartProps = {
       data: chartData,
     };
+
 
     const commonProps = {
       dataKey: "value",
@@ -206,13 +197,19 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
       case "bar":
       default:
         return (
-          <BarChart {...chartProps}>
+          <BarChart {...chartProps} margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="periodLabel" />
+            <XAxis 
+              dataKey="periodLabel" 
+              interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={80}
+            />
             <YAxis />
             <Tooltip 
               formatter={(value: number) => [value, getAggregationLabel()]}
-              labelFormatter={(label) => `Month: ${label}`}
+              labelFormatter={(label) => `Period: ${label}`}
             />
             <Bar {...commonProps} />
           </BarChart>
