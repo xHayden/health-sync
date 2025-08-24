@@ -408,9 +408,13 @@ export async function getCounterTimeAggregates(
   // Remove duplicates by period key (just in case)
   const uniqueData = Array.from(new Map(filledData.map(item => [item.period, item])).values());
 
+  // Clamp to current EST period to avoid including future periods
+  const todayKey = getPeriodKeyEST(getNowInEST(), groupBy);
+  const clampedData = uniqueData.filter(item => item.period <= todayKey);
+
 
   // Convert to array and calculate derived values
-  const result = uniqueData.map((data) => {
+  const result = clampedData.map((data) => {
     const netChange = (data.endValue || 0) - (data.startValue || 0);
     
     return {

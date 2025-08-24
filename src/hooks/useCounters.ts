@@ -63,7 +63,7 @@ export function useCounters(userId: number, enabled: boolean) {
   const query = useQuery({
     queryKey: ["counters", userId],
     queryFn: () => fetchCounters(userId),
-    enabled: !!userId && enabled,
+    enabled: !!userId && enabled && pendingOps === 0,
     // Always poll, but control cache updates
     refetchInterval: 5 * 1000,
     // Prevent cache updates when there are pending operations
@@ -151,6 +151,8 @@ export function useCounters(userId: number, enabled: boolean) {
 
   const enqueueUpdate = (args: UpdateArgs) => {
     const { id, ...data } = args;
+    // Cancel any in-flight fetches to avoid stale responses overwriting optimistic state
+    void queryClient.cancelQueries({ queryKey: ["counters", userId], exact: true });
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       toast.warning("Offline: update queued", {
         description: "We'll send your counter update when you're back online.",
@@ -164,6 +166,13 @@ export function useCounters(userId: number, enabled: boolean) {
     // Debounce flush to coalesce rapid clicks, but maintain ordering in the queue
     scheduleFlush(id, 150);
   };
+
+  // Once all pending operations have flushed, immediately refetch to reconcile with server
+  useEffect(() => {
+    if (pendingOps === 0) {
+      queryClient.invalidateQueries({ queryKey: ["counters", userId] });
+    }
+  }, [pendingOps, queryClient, userId]);
 
   // Prevent page unload/navigation while there are pending queued updates
   useEffect(() => {
