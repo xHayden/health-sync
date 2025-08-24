@@ -65,7 +65,7 @@ export function useCounters(userId: number, enabled: boolean) {
     queryFn: () => fetchCounters(userId),
     enabled: !!userId && enabled && pendingOps === 0,
     // Always poll, but control cache updates
-    refetchInterval: 5 * 1000,
+    refetchInterval: 60 * 1000,
     // Prevent cache updates when there are pending operations
     select: (data) => {
       if (pendingOps > 0) {
@@ -123,6 +123,22 @@ export function useCounters(userId: number, enabled: boolean) {
         const next = q.shift()!;
         try {
           await updateCounterMutation.mutateAsync(next);
+          // Proactively refresh any widgets that depend on this counter's data
+          const counterId = next.id;
+          // Invalidate aggregated time-series queries for this counter
+          queryClient.invalidateQueries({
+            predicate: (query) =>
+              Array.isArray(query.queryKey) &&
+              query.queryKey[0] === "counterTimeAggregated" &&
+              query.queryKey[2] === counterId,
+          });
+          // Invalidate raw history queries for this counter
+          queryClient.invalidateQueries({
+            predicate: (query) =>
+              Array.isArray(query.queryKey) &&
+              query.queryKey[0] === "counterHistory" &&
+              query.queryKey[2] === counterId,
+          });
         } catch (e) {
           // On error, refetch to reconcile and stop further sends for this id.
           queryClient.invalidateQueries({ queryKey: ["counters", userId] });
