@@ -3,6 +3,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { WidgetSetting, WidgetValue } from "@/lib/widgetRegistry";
 import { Property } from "csstype";
 import { DailyWorkoutSummary } from "@prisma/client";
+import { getNowInEST } from "@/utils/timezone";
 
 export interface ActivityCalendarProps {
   workoutSummaries: DailyWorkoutSummary[];
@@ -75,7 +76,7 @@ export function ActivityCalendar({
     <div className="rounded-md shadow-sm w-full h-full">
       <Calendar
         mode="default"
-        selected={new Date()}
+        selected={getNowInEST()}
         className="rounded-md shadow-sm w-full h-full bg-transparent"
         modifiers={{
           metGoal: metGoalDays,

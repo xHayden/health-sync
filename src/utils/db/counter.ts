@@ -2,6 +2,18 @@ import { Counter, PermissionType } from "@prisma/client";
 import { checkHasSharePermission, DBAdapter } from "../db";
 import { PermissionError } from "@/lib/errors";
 import { CheckHasSharePermissionArgs } from "./sharedLayout";
+import { 
+  getNowInEST, 
+  getStartOfDayEST, 
+  getEndOfDayEST, 
+  getStartOfMonthEST, 
+  getEndOfMonthEST, 
+  getStartOfHourEST, 
+  getEndOfHourEST,
+  getPeriodKeyEST,
+  addPeriodEST,
+  toEST
+} from "../timezone";
 
 /**
  * Fetch all counters for a given user.
@@ -244,32 +256,27 @@ export async function getCounterTimeAggregates(
       throw new PermissionError(resourceArgs);
   }
 
-  const now = new Date();
+  const now = getNowInEST();
   let startDate: Date;
   let endDate: Date;
 
-  // Calculate start and end dates based on groupBy and timeRange
+  // Calculate start and end dates based on groupBy and timeRange in EST
   // Always include the current period (day/month/hour) plus (timeRange-1) previous periods
   if (groupBy === "month") {
     // Start from the first day of the month that is (timeRange-1) months before current month
-    startDate = new Date(now.getFullYear(), now.getMonth() - (timeRange - 1), 1, 0, 0, 0, 0);
+    startDate = getStartOfMonthEST(addPeriodEST(now, -(timeRange - 1), "month"));
     // End at the last moment of the current month to include the full current month
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    endDate = getEndOfMonthEST(now);
   } else if (groupBy === "day") {
     // Start from 00:00:00 of the day that is (timeRange-1) days before today
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - (timeRange - 1));
-    startDate.setHours(0, 0, 0, 0);
+    startDate = getStartOfDayEST(addPeriodEST(now, -(timeRange - 1), "day"));
     // End at 23:59:59 of today to include the full current day
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
+    endDate = getEndOfDayEST(now);
   } else { // hour
     // Start from the beginning of the hour that is (timeRange-1) hours before current hour
-    startDate = new Date(now);
-    startDate.setHours(startDate.getHours() - (timeRange - 1), 0, 0, 0);
+    startDate = getStartOfHourEST(addPeriodEST(now, -(timeRange - 1), "hour"));
     // End at the end of the current hour to include the full current hour
-    endDate = new Date(now);
-    endDate.setMinutes(59, 59, 999);
+    endDate = getEndOfHourEST(now);
   }
 
 
@@ -298,15 +305,7 @@ export async function getCounterTimeAggregates(
 
   // Group entries by period and collect all changes for each period
   sortedHistory.forEach((entry) => {
-    let periodKey: string;
-    
-    if (groupBy === "month") {
-      periodKey = entry.timestamp.toISOString().substring(0, 7); // "YYYY-MM"
-    } else if (groupBy === "day") {
-      periodKey = entry.timestamp.toISOString().substring(0, 10); // "YYYY-MM-DD"
-    } else { // hour
-      periodKey = entry.timestamp.toISOString().substring(0, 13); // "YYYY-MM-DDTHH"
-    }
+    const periodKey = getPeriodKeyEST(entry.timestamp, groupBy);
     
     if (!timeData.has(periodKey)) {
       timeData.set(periodKey, {
@@ -340,13 +339,21 @@ export async function getCounterTimeAggregates(
         data.startValue = previousEndValue;
       } else {
         // This is the first period with changes - look up what came before
+        // Create dates that represent the start of the period in EST
         let periodStartDate: Date;
         if (groupBy === "day") {
-          periodStartDate = new Date(periodKey + "T00:00:00.000Z");
+          // periodKey is like "2024-01-15", create EST midnight for that date
+          const [year, month, day] = periodKey.split('-').map(Number);
+          periodStartDate = new Date(year, month - 1, day, 0, 0, 0, 0);
         } else if (groupBy === "hour") {
-          periodStartDate = new Date(periodKey + ":00:00.000Z");
+          // periodKey is like "2024-01-15T14", create EST start of that hour
+          const [datePart, hour] = periodKey.split('T');
+          const [year, month, day] = datePart.split('-').map(Number);
+          periodStartDate = new Date(year, month - 1, day, Number(hour), 0, 0, 0);
         } else { // month
-          periodStartDate = new Date(periodKey + "-01T00:00:00.000Z");
+          // periodKey is like "2024-01", create EST start of that month
+          const [year, month] = periodKey.split('-').map(Number);
+          periodStartDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
         }
         
         const previousEntry = await DBAdapter.getPrismaClient().counterHistory.findFirst({
@@ -361,14 +368,19 @@ export async function getCounterTimeAggregates(
         data.startValue = previousEntry?.value || 0;
       }
       
-      // End value: last change in this period, or current value if this is today
-      const today = new Date().toISOString().substring(0, 10);
-      const currentHour = new Date().toISOString().substring(0, 13);
-      const currentMonth = new Date().toISOString().substring(0, 7);
+      // End value: last change in this period, or current value if this is the current period
+      // Always use EST time for current period detection regardless of server timezone
+      const currentTimeEST = getNowInEST();
+      const currentPeriodKey = getPeriodKeyEST(currentTimeEST, groupBy);
+      const isCurrentPeriod = periodKey === currentPeriodKey;
       
-      const isCurrentPeriod = (groupBy === "day" && periodKey === today) ||
-                             (groupBy === "hour" && periodKey === currentHour) ||
-                             (groupBy === "month" && periodKey === currentMonth);
+      // console.log('Current period detection debug:', {
+      //   periodKey,
+      //   currentPeriodKey, 
+      //   isCurrentPeriod,
+      //   groupBy,
+      //   currentValue
+      // });
       
       if (isCurrentPeriod) {
         data.endValue = currentValue;
@@ -392,10 +404,13 @@ export async function getCounterTimeAggregates(
 
   // Fill in missing periods with zero data
   const filledData = fillMissingPeriods(timeData, startDate, endDate, groupBy);
+  
+  // Remove duplicates by period key (just in case)
+  const uniqueData = Array.from(new Map(filledData.map(item => [item.period, item])).values());
 
 
   // Convert to array and calculate derived values
-  const result = filledData.map((data) => {
+  const result = uniqueData.map((data) => {
     const netChange = (data.endValue || 0) - (data.startValue || 0);
     
     return {
@@ -423,18 +438,16 @@ function fillMissingPeriods(
   groupBy: "month" | "day" | "hour"
 ): any[] {
   const result: any[] = [];
+  
+  // Get period keys for start and end dates
+  const startPeriodKey = getPeriodKeyEST(startDate, groupBy);
+  const endPeriodKey = getPeriodKeyEST(endDate, groupBy);
+  
+  // Generate all period keys from start to end
   const current = new Date(startDate);
-
-  while (current <= endDate) {
-    let periodKey: string;
-    
-    if (groupBy === "month") {
-      periodKey = current.toISOString().substring(0, 7); // "YYYY-MM"
-    } else if (groupBy === "day") {
-      periodKey = current.toISOString().substring(0, 10); // "YYYY-MM-DD"
-    } else { // hour
-      periodKey = current.toISOString().substring(0, 13); // "YYYY-MM-DDTHH"
-    }
+  
+  while (getPeriodKeyEST(current, groupBy) <= endPeriodKey) {
+    const periodKey = getPeriodKeyEST(current, groupBy);
 
     const existingData = timeData.get(periodKey);
     if (existingData) {
@@ -456,6 +469,12 @@ function fillMissingPeriods(
       current.setDate(current.getDate() + 1);
     } else { // hour
       current.setHours(current.getHours() + 1);
+    }
+    
+    // Safety check to prevent infinite loop
+    if (result.length > 1000) {
+      console.error('fillMissingPeriods infinite loop detected!');
+      break;
     }
   }
 

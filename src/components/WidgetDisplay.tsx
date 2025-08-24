@@ -41,26 +41,30 @@ export default function WidgetDisplay({ widget, user }: WidgetDisplayProps) {
     data: workoutData,
     isLoading: isLoadingWorkout,
     error: workoutError,
-  } = useWorkoutSummaries(user.id, needsWorkoutData || needsActivityDaysLevelsData);
+  } = useWorkoutSummaries(user.id, true);
 
-  const {
-    data: sleepData,
-    isLoading: isLoadingSleep,
-    error: sleepError,
-  } = useSleepSummaries(user.id, needsSleepData);
+  // Sleep summaries temporarily disabled
+  const sleepData = null;
+  const isLoadingSleep = false;
+  const sleepError = null;
 
   const {
     data: counterData,
     isLoading: isLoadingCounters,
     error: counterError,
     updateCounter,
-  } = useCounters(user.id, needsCounterData);
+  } = useCounters(user.id, true);
 
   if (!widgetMeta) {
     return <div>No widget type</div>;
   }
 
-  if (workoutError || sleepError || counterError) {
+  if (
+    (needsWorkoutData && workoutError) ||
+    (needsActivityDaysLevelsData && workoutError) ||
+    (needsSleepData && sleepError) ||
+    (needsCounterData && counterError)
+  ) {
     return <div>Error loading widget data.</div>;
   }
 

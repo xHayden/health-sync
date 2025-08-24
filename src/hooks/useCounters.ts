@@ -52,18 +52,34 @@ async function deleteCounterApi(userId: number, id: number): Promise<void> {
 
 export function useCounters(userId: number, enabled: boolean) {
   const queryClient = useQueryClient();
+  
+  // --- Optimistic, ordered, debounced queue ---
+  type UpdateArgs = { id: number } & Partial<Omit<Counter, "id">>;
+  const queuesRef = useRef<Map<number, UpdateArgs[]>>(new Map());
+  const flushingRef = useRef<Set<number>>(new Set());
+  const debouncersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [pendingOps, setPendingOps] = useState(0);
+
   const query = useQuery({
     queryKey: ["counters", userId],
     queryFn: () => fetchCounters(userId),
     enabled: !!userId && enabled,
+    // Always poll, but control cache updates
+    refetchInterval: 5 * 1000,
+    // Prevent cache updates when there are pending operations
+    select: (data) => {
+      if (pendingOps > 0) {
+        // Return current cached data to prevent updates during pending ops
+        return queryClient.getQueryData<Counter[]>(["counters", userId]) || data;
+      }
+      return data;
+    },
   });
 
   const createCounter = useMutation({
     mutationFn: (data: Omit<Counter, "id">) =>
       createCounterApi(userId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["counters", userId] });
-    },
+    // Remove invalidation - let polling handle updates
   });
 
   // Low-level mutation for actually calling the API
@@ -73,21 +89,14 @@ export function useCounters(userId: number, enabled: boolean) {
       ...data
     }: { id: number } & Partial<Omit<Counter, "id">>) =>
       updateCounterApi(userId, id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["counters", userId] });
-    },
+    // Remove invalidation - let polling handle updates
     onError: (error: any) => {
       const message = error?.message || "Failed to update counter";
       toast.error("Counter update failed", { description: message });
+      // Only invalidate on error to get correct server state
+      queryClient.invalidateQueries({ queryKey: ["counters", userId] });
     },
   });
-
-  // --- Optimistic, ordered, debounced queue ---
-  type UpdateArgs = { id: number } & Partial<Omit<Counter, "id">>;
-  const queuesRef = useRef<Map<number, UpdateArgs[]>>(new Map());
-  const flushingRef = useRef<Set<number>>(new Set());
-  const debouncersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-  const [pendingOps, setPendingOps] = useState(0);
 
   const getQueue = (id: number) => {
     let q = queuesRef.current.get(id);
@@ -200,9 +209,7 @@ export function useCounters(userId: number, enabled: boolean) {
 
   const deleteCounter = useMutation({
     mutationFn: (id: number) => deleteCounterApi(userId, id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["counters", userId] });
-    },
+    // Remove invalidation - let polling handle updates
   });
 
   return {

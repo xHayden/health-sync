@@ -122,22 +122,27 @@ const MonthGraph: React.FC<MonthGraphProps> = ({
       }
 
       // Format the period label based on grouping type
+      // Use explicit date construction to avoid timezone issues
       let periodLabel: string;
       if (timeGrouping === "month") {
-        periodLabel = new Date(data.period + "-01").toLocaleDateString("en-US", {
+        const [year, month] = data.period.split('-').map(Number);
+        const date = new Date(year, month - 1, 1);
+        periodLabel = date.toLocaleDateString("en-US", {
           month: "short",
           year: "2-digit",
         });
       } else if (timeGrouping === "day") {
-        // Add explicit time to avoid timezone issues
-        const dateObj = new Date(data.period + "T12:00:00");
-        periodLabel = dateObj.toLocaleDateString("en-US", {
+        const [year, month, day] = data.period.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        periodLabel = date.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
         });
       } else { // hour
-        const hourDate = new Date(data.period + ":00:00.000Z");
-        periodLabel = hourDate.toLocaleTimeString("en-US", {
+        const [datePart, hour] = data.period.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const date = new Date(year, month - 1, day, Number(hour));
+        periodLabel = date.toLocaleTimeString("en-US", {
           hour: "numeric",
           hour12: true,
         });

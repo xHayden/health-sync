@@ -17,12 +17,14 @@ export default function QueryProvider({
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        // Poll every 5 minutes for data updates
-        refetchInterval: 5 * 60 * 1000, // 5 minutes in milliseconds
+        // Poll every 5 seconds for testing
+        refetchInterval: 5 * 1000, // 5 seconds in milliseconds
         // Only refetch when window is in focus to be respectful of resources
         refetchIntervalInBackground: false,
         // Don't refetch on window focus since we're already polling
         refetchOnWindowFocus: false,
+        // Force fresh data on each poll
+        staleTime: 0,
       },
     },
   }));

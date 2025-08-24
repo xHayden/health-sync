@@ -44,10 +44,18 @@ const Counter: React.FC<CounterProps> = ({
 
   // Initialize or reconcile optimistic value from selected counter
   useEffect(() => {
-    if (selectedCounter && optimisticValue == null) {
-      setOptimisticValue(selectedCounter.value);
+    if (selectedCounter) {
+      // Initialize on first load
+      if (optimisticValue == null) {
+        setOptimisticValue(selectedCounter.value);
+      }
+      // Update from server only when no pending operations and values differ
+      // This allows external changes while preserving local optimistic updates
+      else if (!updateCounter.isPending && selectedCounter.value !== optimisticValue) {
+        setOptimisticValue(selectedCounter.value);
+      }
     }
-  }, [selectedCounter, optimisticValue]);
+  }, [selectedCounter?.value, optimisticValue, updateCounter.isPending]);
 
   const handleIncrement = (n: number = 1) => {
     if (!selectedCounter) return;
