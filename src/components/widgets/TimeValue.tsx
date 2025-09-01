@@ -8,6 +8,7 @@ import { WidgetSetting } from "@/lib/widgetRegistry";
 import { AdditionalHooks } from "../WidgetDisplay";
 import { Counter as CounterType } from "@prisma/client";
 import { useCounterTimeAggregatedDataHook } from "@/hooks/useCounterHistory";
+import { getNowInEST, getPeriodKeyEST } from "@/utils/timezone";
 
 export interface TimeValueProps {
   counters: CounterType[];
@@ -31,6 +32,9 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
 
   const aggregationTypeSetting = settings.find((s) => s.key === "aggregationType");
   const aggregationType = (aggregationTypeSetting?.value ?? aggregationTypeSetting?.defaultValue ?? "net") as "net" | "total" | "average";
+
+  const valueModeSetting = settings.find((s) => s.key === "valueMode");
+  const valueMode = (valueModeSetting?.value ?? valueModeSetting?.defaultValue ?? "current") as "current" | "range";
 
   const cardNameSetting = settings.find((s) => s.key === "cardName");
   const cardName = (cardNameSetting?.value ?? cardNameSetting?.defaultValue ?? "Time Value") as string;
@@ -71,6 +75,24 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
 
   const value = useMemo(() => {
     if (!timeData || timeData.length === 0) return null;
+
+    if (valueMode === "current") {
+      const now = getNowInEST();
+      const currentKey = getPeriodKeyEST(now, timeGrouping);
+      const current = timeData.find((d) => d.period === currentKey);
+      if (!current) return 0;
+      switch (aggregationType) {
+        case "total":
+          return current.totalChanges;
+        case "average":
+          return current.averageValue;
+        case "net":
+        default:
+          return current.netChange;
+      }
+    }
+
+    // valueMode === "range" → aggregate across the returned range
     switch (aggregationType) {
       case "total":
         return timeData.reduce((sum, d) => sum + d.totalChanges, 0);
@@ -80,7 +102,7 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
       default:
         return timeData.reduce((sum, d) => sum + d.netChange, 0);
     }
-  }, [timeData, aggregationType]);
+  }, [timeData, aggregationType, valueMode, timeGrouping]);
 
   const formattedValue = useMemo(() => {
     if (value == null) return "-";

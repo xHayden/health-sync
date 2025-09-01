@@ -425,6 +425,17 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
         ],
         defaultValue: "net",
         description: "How to compute the value across the period"
+      },
+      {
+        key: "valueMode",
+        label: "Value Mode",
+        type: "select",
+        options: [
+          { label: "Current Period Only", value: "current" },
+          { label: "Sum Over Range", value: "range" }
+        ],
+        defaultValue: "current",
+        description: "Show the current month/day/hour value or the total across the range"
       }
     ],
     requiredData: [
