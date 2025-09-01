@@ -8,7 +8,6 @@ import { WidgetSetting } from "@/lib/widgetRegistry";
 import { AdditionalHooks } from "../WidgetDisplay";
 import { Counter as CounterType } from "@prisma/client";
 import { useCounterTimeAggregatedDataHook } from "@/hooks/useCounterHistory";
-import { getNowInEST, getPeriodKeyEST } from "@/utils/timezone";
 
 export interface TimeValueProps {
   counters: CounterType[];
@@ -77,18 +76,17 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
     if (!timeData || timeData.length === 0) return null;
 
     if (valueMode === "current") {
-      const now = getNowInEST();
-      const currentKey = getPeriodKeyEST(now, timeGrouping);
-      const current = timeData.find((d) => d.period === currentKey);
-      if (!current) return 0;
+      // Use the most recent server-aggregated interval (matches MonthGraph behavior)
+      const latest = [...timeData].sort((a, b) => a.period.localeCompare(b.period)).at(-1);
+      if (!latest) return 0;
       switch (aggregationType) {
         case "total":
-          return current.totalChanges;
+          return latest.totalChanges;
         case "average":
-          return current.averageValue;
+          return latest.averageValue;
         case "net":
         default:
-          return current.netChange;
+          return latest.netChange;
       }
     }
 
@@ -102,7 +100,7 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
       default:
         return timeData.reduce((sum, d) => sum + d.netChange, 0);
     }
-  }, [timeData, aggregationType, valueMode, timeGrouping]);
+  }, [timeData, aggregationType, valueMode]);
 
   const formattedValue = useMemo(() => {
     if (value == null) return "-";
