@@ -279,7 +279,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow"
+            className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow overflow-hidden"
           >
             <WidgetOptionsMenu
               onSettingsClick={(e) => {
@@ -464,7 +464,7 @@ const DraggableResizableWidget: React.FC<DraggableResizableWidgetProps> = ({
         ref={setNodeRef}
         {...listeners}
         {...attributes}
-        className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow"
+        className="relative w-full h-full bg-background border-2 border-muted-foreground rounded-4xl shadow overflow-hidden"
       >
         <div className="w-full h-full flex items-center justify-center">
           <WidgetDisplay widget={widget} user={user} />

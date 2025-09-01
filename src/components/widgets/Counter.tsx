@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -33,6 +33,9 @@ const Counter: React.FC<CounterProps> = ({
   );
   const updateCounter = additionalHooks?.updateCounter;
   const [optimisticValue, setOptimisticValue] = useState<number | null>(null);
+  const numberContainerRef = useRef<HTMLDivElement>(null);
+  const numberRef = useRef<HTMLSpanElement>(null);
+  const [fontSizePx, setFontSizePx] = useState<number>(96); // ~text-8xl (6rem)
 
   useEffect(() => {
     if (!dataSourceValue || !counters || counters.length == 0) {
@@ -93,6 +96,40 @@ const Counter: React.FC<CounterProps> = ({
     }
   }, [counters]);
 
+  const displayValue = optimisticValue ?? selectedCounter?.value ?? 0;
+
+  // Auto-fit the number text to prevent overflow and button spillover
+  useEffect(() => {
+    const container = numberContainerRef.current;
+    const el = numberRef.current;
+    if (!container || !el) return;
+
+    const fit = () => {
+      const maxSize = 96; // px
+      let size = maxSize;
+      el.style.whiteSpace = "nowrap";
+      el.style.display = "inline-block";
+      el.style.fontSize = `${size}px`;
+      const padding = 8; // small buffer
+      const target = Math.max(0, container.clientWidth - padding);
+      // Reduce font size until it fits or reaches a sensible minimum
+      while (el.scrollWidth > target && size > 16) {
+        size -= 2;
+        el.style.fontSize = `${size}px`;
+      }
+      setFontSizePx(size);
+    };
+
+    fit();
+
+    // Observe container size changes
+    const ro = new ResizeObserver(() => fit());
+    ro.observe(container);
+    return () => {
+      ro.disconnect();
+    };
+  }, [displayValue, selectedCounter?.id]);
+
   return (
     <div className="w-full mx-2 bg-transparent">
       <CardHeader className="flex items-center text-xl">
@@ -125,9 +162,11 @@ const Counter: React.FC<CounterProps> = ({
                 -10
               </Button>
             </div>
-            <span className="text-8xl font-semibold">
-              {optimisticValue ?? selectedCounter?.value}
-            </span>
+            <div ref={numberContainerRef} className="flex-1 min-w-0 flex justify-center">
+              <span ref={numberRef} style={{ fontSize: fontSizePx }} className="font-semibold leading-none">
+                {displayValue}
+              </span>
+            </div>
             <div className="flex flex-col gap-4 *:w-16 *:h-16 *:text-2xl *:border-gray-600">
               <Button
                 variant="outline"

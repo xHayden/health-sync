@@ -15,6 +15,7 @@ import WorkoutChart, { WorkoutChartProps } from "@/components/widgets/WorkoutCha
 import { ActivityCalendar } from "@/components/widgets/ActivityCalendar";
 import Counter, { CounterProps } from "@/components/widgets/Counter";
 import MonthGraph, { MonthGraphProps } from "@/components/widgets/MonthGraph";
+import TimeValue from "@/components/widgets/TimeValue";
 import { DailyWorkoutSummary } from "@prisma/client";
 
 /**
@@ -102,7 +103,7 @@ export interface WidgetMeta<
  *
  * When adding a new widget, add its unique key to this type union.
  */
-export type WidgetValue = "workoutChart" | "activityCalendar" | "counter" | "monthGraph";
+export type WidgetValue = "workoutChart" | "activityCalendar" | "counter" | "monthGraph" | "timeValue";
 
 /**
  * The widgetRegistry maps widget keys to their corresponding metadata.
@@ -371,6 +372,63 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
     requiredData: [
       WidgetMetaDataTypes.Counters,
       WidgetMetaDataTypes.CounterHistory
+    ],
+  },
+  timeValue: {
+    name: "Time Value",
+    description: "Displays an aggregated counter value over a selected time range.",
+    component: TimeValue,
+    dummyData: {
+    },
+    settings: [
+      {
+        key: "cardName",
+        label: "Widget Name",
+        type: "text",
+        defaultValue: "Time Value",
+        description: "Name for the time value widget.",
+      },
+      {
+        key: "dataSource",
+        type: "dropdown",
+        label: "Counter Data Source",
+        description: "Counter to aggregate over",
+        source: "counters"
+      },
+      {
+        key: "timeGrouping",
+        label: "Time Grouping",
+        type: "select",
+        options: [
+          { label: "By Month", value: "month" },
+          { label: "By Day", value: "day" },
+          { label: "By Hour", value: "hour" }
+        ],
+        defaultValue: "month",
+        description: "How to group the counter data over time"
+      },
+      {
+        key: "timeRange",
+        label: "Time Range",
+        type: "number",
+        defaultValue: 1,
+        description: "Number of periods to include (e.g., last 1 month, 1 day)"
+      },
+      {
+        key: "aggregationType",
+        label: "Aggregation Type",
+        type: "select",
+        options: [
+          { label: "Net Change (sum)", value: "net" },
+          { label: "Total Changes (sum)", value: "total" },
+          { label: "Average Value", value: "average" }
+        ],
+        defaultValue: "net",
+        description: "How to compute the value across the period"
+      }
+    ],
+    requiredData: [
+      WidgetMetaDataTypes.Counters
     ],
   },
   // To add a new widget, follow the pattern below:
