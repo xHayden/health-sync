@@ -39,15 +39,16 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
   const cardName = (cardNameSetting?.value ?? cardNameSetting?.defaultValue ?? "Time Value") as string;
 
   function getDefaultTimeRange(groupBy: string): number {
+    // Match MonthGraph defaults exactly
     switch (groupBy) {
       case "month":
-        return 1;
+        return 12;
       case "day":
-        return 1;
+        return 30;
       case "hour":
         return 24;
       default:
-        return 1;
+        return 12;
     }
   }
 
@@ -72,35 +73,38 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
     !!selectedCounter && !!userId
   );
 
+  // Build chartData exactly like MonthGraph for consistent value selection
+  const chartData = useMemo(() => {
+    if (!timeData || timeData.length === 0) return [] as { value: number }[];
+    return timeData.map((data) => {
+      let value: number;
+      switch (aggregationType) {
+        case "total":
+          value = data.totalChanges;
+          break;
+        case "average":
+          value = data.averageValue;
+          break;
+        case "net":
+        default:
+          value = data.netChange;
+          break;
+      }
+      return { value };
+    });
+  }, [timeData, aggregationType]);
+
   const value = useMemo(() => {
     if (!timeData || timeData.length === 0) return null;
 
     if (valueMode === "current") {
-      // Use the most recent server-aggregated interval in order returned by API
-      const latest = timeData[timeData.length - 1];
-      if (!latest) return 0;
-      switch (aggregationType) {
-        case "total":
-          return latest.totalChanges;
-        case "average":
-          return latest.averageValue;
-        case "net":
-        default:
-          return latest.netChange;
-      }
+      const latestPoint = chartData[chartData.length - 1];
+      return latestPoint ? latestPoint.value : 0;
     }
 
-    // valueMode === "range" → aggregate across the returned range
-    switch (aggregationType) {
-      case "total":
-        return timeData.reduce((sum, d) => sum + d.totalChanges, 0);
-      case "average":
-        return timeData.reduce((sum, d) => sum + d.averageValue, 0) / timeData.length;
-      case "net":
-      default:
-        return timeData.reduce((sum, d) => sum + d.netChange, 0);
-    }
-  }, [timeData, aggregationType, valueMode]);
+    // Sum across range using the same mapped values
+    return chartData.reduce((sum, d) => sum + d.value, 0);
+  }, [timeData, chartData, valueMode]);
 
   const formattedValue = useMemo(() => {
     if (value == null) return "-";
