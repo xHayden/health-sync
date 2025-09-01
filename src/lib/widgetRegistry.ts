@@ -405,37 +405,7 @@ const widgetRegistry: Record<WidgetValue, WidgetMeta<any>> = {
           { label: "By Hour", value: "hour" }
         ],
         defaultValue: "month",
-        description: "How to group the counter data over time"
-      },
-      {
-        key: "timeRange",
-        label: "Time Range",
-        type: "number",
-        defaultValue: 1,
-        description: "Number of periods to include (e.g., last 1 month, 1 day)"
-      },
-      {
-        key: "aggregationType",
-        label: "Aggregation Type",
-        type: "select",
-        options: [
-          { label: "Net Change (sum)", value: "net" },
-          { label: "Total Changes (sum)", value: "total" },
-          { label: "Average Value", value: "average" }
-        ],
-        defaultValue: "net",
-        description: "How to compute the value across the period"
-      },
-      {
-        key: "valueMode",
-        label: "Value Mode",
-        type: "select",
-        options: [
-          { label: "Current Period Only", value: "current" },
-          { label: "Sum Over Range", value: "range" }
-        ],
-        defaultValue: "current",
-        description: "Show the current month/day/hour value or the total across the range"
+        description: "Pick which single latest period to display"
       }
     ],
     requiredData: [

@@ -25,15 +25,10 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
   const timeGroupingSetting = settings.find((s) => s.key === "timeGrouping");
   const timeGrouping = (timeGroupingSetting?.value ?? timeGroupingSetting?.defaultValue ?? "month") as "month" | "day" | "hour";
 
-  const timeRangeSetting = settings.find((s) => s.key === "timeRange");
-  const timeRangeRaw = timeRangeSetting?.value ?? timeRangeSetting?.defaultValue;
-  const timeRange = timeRangeRaw ? Number(timeRangeRaw) : getDefaultTimeRange(timeGrouping);
+  // Simplify: always request only the latest period from the server
+  const effectiveTimeRange = 1;
 
-  const aggregationTypeSetting = settings.find((s) => s.key === "aggregationType");
-  const aggregationType = (aggregationTypeSetting?.value ?? aggregationTypeSetting?.defaultValue ?? "net") as "net" | "total" | "average";
-
-  const valueModeSetting = settings.find((s) => s.key === "valueMode");
-  const valueMode = (valueModeSetting?.value ?? valueModeSetting?.defaultValue ?? "current") as "current" | "range";
+  // Simplified: fixed aggregation (net change) and current period only
 
   const cardNameSetting = settings.find((s) => s.key === "cardName");
   const cardName = (cardNameSetting?.value ?? cardNameSetting?.defaultValue ?? "Time Value") as string;
@@ -69,48 +64,26 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
     userId || 0,
     selectedCounter?.id || 0,
     timeGrouping,
-    timeRange,
+    effectiveTimeRange,
     !!selectedCounter && !!userId
   );
 
-  // Build chartData exactly like MonthGraph for consistent value selection
+  // Build chartData exactly like MonthGraph for consistent value selection (netChange as the primary series)
   const chartData = useMemo(() => {
     if (!timeData || timeData.length === 0) return [] as { value: number }[];
-    return timeData.map((data) => {
-      let value: number;
-      switch (aggregationType) {
-        case "total":
-          value = data.totalChanges;
-          break;
-        case "average":
-          value = data.averageValue;
-          break;
-        case "net":
-        default:
-          value = data.netChange;
-          break;
-      }
-      return { value };
-    });
-  }, [timeData, aggregationType]);
+    return timeData.map((data) => ({ value: data.netChange }));
+  }, [timeData]);
 
   const value = useMemo(() => {
     if (!timeData || timeData.length === 0) return null;
-
-    if (valueMode === "current") {
-      const latestPoint = chartData[chartData.length - 1];
-      return latestPoint ? latestPoint.value : 0;
-    }
-
-    // Sum across range using the same mapped values
-    return chartData.reduce((sum, d) => sum + d.value, 0);
-  }, [timeData, chartData, valueMode]);
+    const latestPoint = chartData[chartData.length - 1];
+    return latestPoint ? latestPoint.value : 0;
+  }, [timeData, chartData]);
 
   const formattedValue = useMemo(() => {
     if (value == null) return "-";
-    if (aggregationType === "average") return Number(value).toFixed(2);
     return Math.round(Number(value)).toString();
-  }, [value, aggregationType]);
+  }, [value]);
 
   if (needsDataSource) {
     return (
