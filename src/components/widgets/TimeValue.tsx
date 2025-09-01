@@ -76,8 +76,8 @@ const TimeValue: React.FC<TimeValueProps> = ({ counters, additionalHooks, settin
     if (!timeData || timeData.length === 0) return null;
 
     if (valueMode === "current") {
-      // Use the most recent server-aggregated interval (matches MonthGraph behavior)
-      const latest = [...timeData].sort((a, b) => a.period.localeCompare(b.period)).at(-1);
+      // Use the most recent server-aggregated interval in order returned by API
+      const latest = timeData[timeData.length - 1];
       if (!latest) return 0;
       switch (aggregationType) {
         case "total":
