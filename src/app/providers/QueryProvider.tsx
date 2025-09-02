@@ -17,8 +17,8 @@ export default function QueryProvider({
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        // Poll every 5 seconds for testing
-        refetchInterval: 5 * 1000, // 5 seconds in milliseconds
+        // Poll every 10 minutes
+        refetchInterval: 10 * 60 * 1000,
         // Only refetch when window is in focus to be respectful of resources
         refetchIntervalInBackground: false,
         // Don't refetch on window focus since we're already polling

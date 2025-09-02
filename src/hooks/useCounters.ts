@@ -65,7 +65,7 @@ export function useCounters(userId: number, enabled: boolean) {
     queryFn: () => fetchCounters(userId),
     enabled: !!userId && enabled && pendingOps === 0,
     // Always poll, but control cache updates
-    refetchInterval: 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
     // Prevent cache updates when there are pending operations
     select: (data) => {
       if (pendingOps > 0) {
