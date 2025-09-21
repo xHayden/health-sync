@@ -13,7 +13,9 @@ export async function insertWorkouts(
   workouts: HealthKitWorkout[] | undefined,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
+  skipSummaryProcessing?: boolean,
+  skipHeartRateAssociation?: boolean
 ): Promise<void> {
   if (!workouts || workouts.length === 0) return;
   if (!authenticated) {
@@ -64,40 +66,44 @@ export async function insertWorkouts(
       }
     );
 
-    // For each inserted workout, find matching heart rate data points and associate them
-    for (const workout of insertedWorkouts) {
-      // Only process if we have a valid endTimestamp
-      if (workout.endTimestamp) {
-        await DBAdapter.getPrismaClient().healthDataPoint.updateMany({
-          where: {
-            userId,
-            category: "heart_rate",
-            timestamp: {
-              gte: workout.timestamp,
-              lte: workout.endTimestamp,
+    // Associate heart rate data with workouts (expensive operation)
+    if (!skipHeartRateAssociation) {
+      for (const workout of insertedWorkouts) {
+        // Only process if we have a valid endTimestamp
+        if (workout.endTimestamp) {
+          await DBAdapter.getPrismaClient().healthDataPoint.updateMany({
+            where: {
+              userId,
+              category: "heart_rate",
+              timestamp: {
+                gte: workout.timestamp,
+                lte: workout.endTimestamp,
+              },
             },
-          },
-          data: {
-            workoutId: workout.id,
-          },
-        });
+            data: {
+              workoutId: workout.id,
+            },
+          });
+        }
       }
     }
 
-    try {
-      await calculateAndStoreWorkoutSummaries(userId);
-    } catch (e) {
-      console.error(
-        `Error calculating workout summaries: ${(e as Error).message}`
-      );
-    }
+    if (!skipSummaryProcessing) {
+      try {
+        await calculateAndStoreWorkoutSummaries(userId);
+      } catch (e) {
+        console.error(
+          `Error calculating workout summaries: ${(e as Error).message}`
+        );
+      }
 
-    try {
-      await calculateAndStoreWorkoutSummaries(userId);
-    } catch (e) {
-      console.error(
-        `Error calculating fitness metrics: ${(e as Error).message}`
-      );
+      try {
+        await calculateAndStoreWorkoutSummaries(userId);
+      } catch (e) {
+        console.error(
+          `Error calculating fitness metrics: ${(e as Error).message}`
+        );
+      }
     }
   }
 }

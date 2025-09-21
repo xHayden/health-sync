@@ -4,6 +4,7 @@ import {
   getMaxHeartRate,
   getRestingHeartRates,
   insertWorkoutSummariesBulk,
+  DBAdapter,
 } from "./db";
 import {
   getAllBodyMass,
@@ -413,6 +414,85 @@ async function calculateAndStoreWorkoutSummaries(
   userId: number
 ): Promise<void> {
   const workouts = await getWorkouts(userId);
+  if (workouts.length === 0) {
+    console.log("No workouts found for user, skipping summary calculation");
+    return;
+  }
+
+  const timestamps = workouts
+    .map((workout) => {
+      const timestamp = workout.timestamp instanceof Date
+        ? workout.timestamp.getTime()
+        : new Date(workout.timestamp).getTime();
+      if (isNaN(timestamp)) {
+        console.error("Invalid workout timestamp:", workout.timestamp);
+        return null;
+      }
+      return timestamp;
+    })
+    .filter((ts): ts is number => ts !== null);
+
+  if (timestamps.length === 0) {
+    console.log("No valid workout timestamps found");
+    return;
+  }
+
+  const minTimestamp = Math.min(...timestamps);
+  const maxTimestamp = Math.max(...timestamps);
+  const startDate = new Date(minTimestamp);
+  startDate.setUTCHours(0, 0, 0, 0);
+  const endDate = new Date(maxTimestamp);
+  endDate.setUTCHours(23, 59, 59, 999);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    throw new Error(`Invalid date range: start=${startDate.toISOString()}, end=${endDate.toISOString()}`);
+  }
+
+  // Get the most recent workout date (last workout day)
+  const lastWorkoutDate = new Date(maxTimestamp);
+  lastWorkoutDate.setUTCHours(0, 0, 0, 0);
+
+  // Check which summaries already exist (excluding the last workout day)
+  const existingSummaries = await DBAdapter.getPrismaClient().dailyWorkoutSummary.findMany({
+    where: {
+      userId,
+      date: {
+        gte: startDate,
+        lt: lastWorkoutDate, // Exclude the last workout day
+      },
+    },
+    select: {
+      date: true,
+    },
+  });
+
+  const existingDates = new Set(
+    existingSummaries.map(summary => summary.date.toISOString().split('T')[0])
+  );
+
+  // Generate all dates that need processing
+  const datesToProcess: Date[] = [];
+  for (let d = new Date(startDate.getTime()); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const dateString = d.toISOString().split('T')[0];
+    const isLastWorkoutDay = d.getTime() === lastWorkoutDate.getTime();
+
+    // Include date if it's the last workout day OR if it doesn't already have a summary
+    if (isLastWorkoutDay || !existingDates.has(dateString)) {
+      datesToProcess.push(new Date(d.getTime()));
+    }
+  }
+
+  if (datesToProcess.length === 0) {
+    console.log("All workout summaries already exist, skipping calculation");
+    return;
+  }
+
+  const totalDates = Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  console.log(`Processing ${datesToProcess.length} dates out of ${totalDates} total dates`);
+  console.log(`Found ${existingDates.size} existing summaries`);
+  console.log(`Last workout date: ${lastWorkoutDate.toISOString()}`);
+  console.log(`Dates to process: ${datesToProcess.map(d => d.toISOString().split('T')[0]).join(', ')}`);
+
   const bodyweights = await getAllBodyMass(userId);
   const hrvSamples = await getAllHRV(userId);
   const hrvCoVSamples = calculateHrvCoV(hrvSamples, userId);
@@ -427,14 +507,6 @@ async function calculateAndStoreWorkoutSummaries(
     );
   }
 
-  const timestamps = workouts.map((workout) => workout.timestamp.getTime());
-
-  const minTimestamp = Math.min(...timestamps);
-  const maxTimestamp = Math.max(...timestamps);
-  const startDate = new Date(minTimestamp);
-  startDate.setUTCHours(0, 0, 0, 0);
-  const endDate = new Date(maxTimestamp);
-  endDate.setUTCHours(23, 59, 59, 999);
   console.log("Start, end", startDate.toISOString(), endDate.toISOString());
 
   const workoutSummaries: Prisma.DailyWorkoutSummaryCreateInput[] =
@@ -452,7 +524,24 @@ async function calculateAndStoreWorkoutSummaries(
       userId
     );
 
-  await insertWorkoutSummariesBulk(userId, workoutSummaries);
+  // Filter summaries to only include dates that need processing
+  const summariesToInsert = workoutSummaries.filter(summary => {
+    const summaryDate = summary.date instanceof Date
+      ? summary.date.toISOString().split('T')[0]
+      : summary.date.split('T')[0];
+
+    return datesToProcess.some(date =>
+      date.toISOString().split('T')[0] === summaryDate
+    );
+  });
+
+  console.log(`Filtered summaries: ${summariesToInsert.length} out of ${workoutSummaries.length} total summaries`);
+
+  if (summariesToInsert.length > 0) {
+    await insertWorkoutSummariesBulk(userId, summariesToInsert);
+  } else {
+    console.log("No new summaries to insert after filtering");
+  }
 }
 
 function isDBHealthDataPoint(

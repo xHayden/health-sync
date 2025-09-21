@@ -53,6 +53,6 @@ export const config = {
     // pages
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
     // api (except /api/v1/users)
-    "/api/v1/:path((?!users).*)",
+    "/api/v1/:path((?!(?:users|sync)).*)",
   ],
 };
