@@ -126,7 +126,6 @@ export const useSharingStore = create<SharingState>(
           const { data } = await axios.get(
             `/api/v1/layouts/share?sharedUserId=${sharedUserId}`
           );
-
           const shares = data.data as UserShare[];
           set({ shareLayoutConnections: shares });
 

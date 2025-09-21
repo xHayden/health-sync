@@ -58,7 +58,7 @@ const Counter: React.FC<CounterProps> = ({
         setOptimisticValue(selectedCounter.value);
       }
     }
-  }, [selectedCounter?.value, optimisticValue, updateCounter.isPending]);
+  }, [selectedCounter?.value, optimisticValue, updateCounter?.isPending]);
 
   const handleIncrement = (n: number = 1) => {
     if (!selectedCounter) return;

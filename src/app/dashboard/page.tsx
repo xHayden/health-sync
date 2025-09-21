@@ -10,7 +10,6 @@ const DashboardPage = async () => {
   const session = await getServerSession(authOptions);
   if (!session || !session.user) {
     redirect("/login");
-    return null;
   }
   const userLayouts = await getLayouts(session.user.id, true);
   const sharedLayoutsData = await getSharedLayoutsForMember(session.user.id);

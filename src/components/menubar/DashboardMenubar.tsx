@@ -15,6 +15,7 @@ import { useLayoutStore } from "@/lib/store/layoutStore";
 import { Session } from "next-auth";
 import { SharedLayoutWithSharedUserAndOwner, TypedLayout, TypedLayoutWithUser } from "@/types/WidgetData";
 import { LayoutBar } from "./LayoutBar";
+import { useSharingStore } from "@/lib/store/sharedLayoutStore";
 
 export default function DashboardMenubar({
   user,
@@ -36,26 +37,29 @@ export default function DashboardMenubar({
   const setLayouts = useLayoutStore((state) => state.setLayouts);
   const setCurrentLayout = useLayoutStore((state) => state.setCurrentLayout);
   const setSharedLayouts = useLayoutStore((state) => state.setSharedLayouts);
+  const fetchSharedWithMe = useSharingStore((state) => state.fetchSharedWithMe);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    if (sharedLayouts) {
+      setSharedLayouts(sharedLayouts);
+      fetchSharedWithMe(user.id);
+    }
     if (userLayouts && !stateLayouts) {
       setLayouts(userLayouts);
     }
-    if (sharedLayouts) {
-      setSharedLayouts(sharedLayouts.map(sh => sh.layout));
-    }
-    if (userLayouts) {
+    if (userLayouts || sharedLayouts) {
       if (
-        userLayouts.length > 0 &&
+        (userLayouts.length > 0 || sharedLayouts.length > 0) &&
         (!currentLayout || !currentLayout?.onDashboard)
       ) {
-        for (const l of userLayouts) {
+        for (const l of [...userLayouts, ...sharedLayouts]) {
           if (l.onDashboard) {
             setCurrentLayout(l);
           }
         }
+
       }
     } else {
       createNewLayout(user);
