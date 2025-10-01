@@ -10,11 +10,12 @@ iOS App:
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/0a4a7e0b-bfce-403c-a69a-426bcec41a20" />
 
-Imported Apple Health Data Demo:
+Imported Apple Health Data Demo (top graph is Acute Training Load vs Chronic Training Load, used by the Athlytic app for measuring over/underexertion; bottom graph is days where the recorded workout time was over over a configurable amount of minutes):
+
 
 ![400](https://img.hayden.gg/CbwIxK0sLt.png)
 
-Pullup Tracker Demo:
+Pullup Tracker Demo (what is on my Raspberry Pi touchscreen):
 
 ![400](https://img.hayden.gg/9C6ZMhQHlk.png)
 
