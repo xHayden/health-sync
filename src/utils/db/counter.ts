@@ -2,17 +2,17 @@ import { Counter, PermissionType } from "@prisma/client";
 import { checkHasSharePermission, DBAdapter } from "../db";
 import { PermissionError } from "@/lib/errors";
 import { CheckHasSharePermissionArgs } from "./sharedLayout";
-import { 
-  getNowInEST, 
-  getStartOfDayEST, 
-  getEndOfDayEST, 
-  getStartOfMonthEST, 
-  getEndOfMonthEST, 
-  getStartOfHourEST, 
+import {
+  getNowInEST,
+  getStartOfDayEST,
+  getEndOfDayEST,
+  getStartOfMonthEST,
+  getEndOfMonthEST,
+  getStartOfHourEST,
   getEndOfHourEST,
   getPeriodKeyEST,
   addPeriodEST,
-  toEST
+  toEST,
 } from "../timezone";
 
 /**
@@ -22,7 +22,7 @@ export async function getCounters(
   userId: number,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ): Promise<Counter[]> {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -31,7 +31,7 @@ export async function getCounters(
       resourceId: null,
       permissionType: PermissionType.READ,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -50,7 +50,7 @@ export async function getCounterById(
   counterId: number,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ): Promise<Counter | null> {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -59,7 +59,7 @@ export async function getCounterById(
       resourceId: counterId,
       permissionType: PermissionType.READ,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -77,7 +77,7 @@ export async function createCounter(
   data: Counter,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ): Promise<Counter> {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -86,7 +86,7 @@ export async function createCounter(
       resourceId: null,
       permissionType: PermissionType.WRITE,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -106,7 +106,7 @@ export async function updateCounter(
   data: Counter,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ): Promise<Counter> {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -115,7 +115,7 @@ export async function updateCounter(
       resourceId: counterId,
       permissionType: PermissionType.WRITE,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -129,26 +129,28 @@ export async function updateCounter(
   }
 
   // Use transaction to ensure both counter update and history entry are created
-  const updatedCounter = await DBAdapter.getPrismaClient().$transaction(async (prisma) => {
-    // Update the counter
-    const updated = await prisma.counter.update({
-      where: { id: counterId },
-      data,
-    });
-
-    // Create history entry if value changed
-    if (data.value !== undefined && data.value !== existing.value) {
-      await prisma.counterHistory.create({
-        data: {
-          counterId,
-          userId,
-          value: data.value,
-        },
+  const updatedCounter = await DBAdapter.getPrismaClient().$transaction(
+    async (prisma) => {
+      // Update the counter
+      const updated = await prisma.counter.update({
+        where: { id: counterId },
+        data,
       });
-    }
 
-    return updated;
-  });
+      // Create history entry if value changed
+      if (data.value !== undefined && data.value !== existing.value) {
+        await prisma.counterHistory.create({
+          data: {
+            counterId,
+            userId,
+            value: data.value,
+          },
+        });
+      }
+
+      return updated;
+    },
+  );
 
   return updatedCounter;
 }
@@ -162,7 +164,7 @@ export async function deleteCounter(
   counterId: number,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ): Promise<void> {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -171,7 +173,7 @@ export async function deleteCounter(
       resourceId: counterId,
       permissionType: PermissionType.WRITE,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -199,7 +201,7 @@ export async function getCounterHistory(
   endDate?: Date,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ) {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -208,7 +210,7 @@ export async function getCounterHistory(
       resourceId: counterId,
       permissionType: PermissionType.READ,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -241,7 +243,7 @@ export async function getCounterTimeAggregates(
   timeRange: number,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ) {
   if (!authenticated) {
     const resourceArgs: CheckHasSharePermissionArgs = {
@@ -250,7 +252,7 @@ export async function getCounterTimeAggregates(
       resourceId: counterId,
       permissionType: PermissionType.READ,
       shareToken,
-      sessionUserId
+      sessionUserId,
     };
     if (!(await checkHasSharePermission(resourceArgs)))
       throw new PermissionError(resourceArgs);
@@ -264,7 +266,9 @@ export async function getCounterTimeAggregates(
   // Always include the current period (day/month/hour) plus (timeRange-1) previous periods
   if (groupBy === "month") {
     // Start from the first day of the month that is (timeRange-1) months before current month
-    startDate = getStartOfMonthEST(addPeriodEST(now, -(timeRange - 1), "month"));
+    startDate = getStartOfMonthEST(
+      addPeriodEST(now, -(timeRange - 1), "month"),
+    );
     // End at the last moment of the current month to include the full current month
     endDate = getEndOfMonthEST(now);
   } else if (groupBy === "day") {
@@ -272,41 +276,46 @@ export async function getCounterTimeAggregates(
     startDate = getStartOfDayEST(addPeriodEST(now, -(timeRange - 1), "day"));
     // End at 23:59:59 of today to include the full current day
     endDate = getEndOfDayEST(now);
-  } else { // hour
+  } else {
+    // hour
     // Start from the beginning of the hour that is (timeRange-1) hours before current hour
     startDate = getStartOfHourEST(addPeriodEST(now, -(timeRange - 1), "hour"));
     // End at the end of the current hour to include the full current hour
     endDate = getEndOfHourEST(now);
   }
 
-
   // Get all history entries for the time period
   const history = await getCounterHistory(
-    counterId, 
-    userId, 
-    startDate, 
-    endDate, 
-    authenticated, 
-    shareToken, 
-    sessionUserId
+    counterId,
+    userId,
+    startDate,
+    endDate,
+    authenticated,
+    shareToken,
+    sessionUserId,
   );
 
   // Group by time period and collect raw changes
-  const timeData = new Map<string, {
-    period: string;
-    changes: number[];
-    startValue?: number;
-    endValue?: number;
-    changeCount: number;
-  }>();
+  const timeData = new Map<
+    string,
+    {
+      period: string;
+      changes: number[];
+      startValue?: number;
+      endValue?: number;
+      changeCount: number;
+    }
+  >();
 
   // Sort history by timestamp to ensure proper chronological order
-  const sortedHistory = history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const sortedHistory = history.sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
 
   // Group entries by period and collect all changes for each period
   sortedHistory.forEach((entry) => {
     const periodKey = getPeriodKeyEST(entry.timestamp, groupBy);
-    
+
     if (!timeData.has(periodKey)) {
       timeData.set(periodKey, {
         period: periodKey,
@@ -320,29 +329,34 @@ export async function getCounterTimeAggregates(
     data.changeCount++;
   });
 
-  // Get current counter value 
+  // Get current counter value
   const counter = await DBAdapter.getPrismaClient().counter.findFirst({
-    where: { id: counterId, userId }
+    where: { id: counterId, userId },
   });
   const currentValue = counter?.value || 0;
   // Determine period keys across the whole requested range
   const allPeriodKeys = generatePeriodKeys(startDate, endDate, groupBy);
 
   // Establish baseline value before the range start
-  const previousBeforeRange = await DBAdapter.getPrismaClient().counterHistory.findFirst({
-    where: {
-      counterId,
-      userId,
-      timestamp: { lt: startDate }
-    },
-    orderBy: { timestamp: 'desc' }
-  });
+  const previousBeforeRange =
+    await DBAdapter.getPrismaClient().counterHistory.findFirst({
+      where: {
+        counterId,
+        userId,
+        timestamp: { lt: startDate },
+      },
+      orderBy: { timestamp: "desc" },
+    });
   let runningValue = previousBeforeRange?.value || 0;
 
   // Compute start/end for every period chronologically
   const currentPeriodKey = getPeriodKeyEST(getNowInEST(), groupBy);
   const computed = allPeriodKeys.map((periodKey) => {
-    const data = timeData.get(periodKey) ?? { period: periodKey, changes: [], changeCount: 0 };
+    const data = timeData.get(periodKey) ?? {
+      period: periodKey,
+      changes: [],
+      changeCount: 0,
+    };
     data.changeCount = data.changes.length;
     data.startValue = runningValue;
     if (data.changes.length > 0) {
@@ -357,23 +371,34 @@ export async function getCounterTimeAggregates(
   });
 
   // Clamp to not exceed current EST period
-  const clampedData = computed.filter(item => item.period <= currentPeriodKey);
+  const clampedData = computed.filter(
+    (item) => item.period <= currentPeriodKey,
+  );
 
   // Convert to array and calculate derived values
-  const result = clampedData.map((data) => {
-    const netChange = (data.endValue || 0) - (data.startValue || 0);
-    
-    return {
-      period: data.period,
-      totalChanges: data.changes.reduce((sum: number, val: number) => sum + Math.abs(val - (data.startValue || 0)), 0),
-      netChange,
-      startValue: data.startValue || 0,
-      endValue: data.endValue || 0,
-      changeCount: data.changeCount,
-      averageValue: data.changes.length > 0 ? 
-        data.changes.reduce((sum: number, val: number) => sum + val, 0) / data.changes.length : 0,
-    };
-  }).sort((a, b) => a.period.localeCompare(b.period));
+  const result = clampedData
+    .map((data) => {
+      const netChange = (data.endValue || 0) - (data.startValue || 0);
+
+      return {
+        period: data.period,
+        totalChanges: data.changes.reduce(
+          (sum: number, val: number) =>
+            sum + Math.abs(val - (data.startValue || 0)),
+          0,
+        ),
+        netChange,
+        startValue: data.startValue || 0,
+        endValue: data.endValue || 0,
+        changeCount: data.changeCount,
+        averageValue:
+          data.changes.length > 0
+            ? data.changes.reduce((sum: number, val: number) => sum + val, 0) /
+              data.changes.length
+            : 0,
+      };
+    })
+    .sort((a, b) => a.period.localeCompare(b.period));
 
   return result;
 }
@@ -384,23 +409,22 @@ export async function getCounterTimeAggregates(
 function generatePeriodKeys(
   startDate: Date,
   endDate: Date,
-  groupBy: "month" | "day" | "hour"
+  groupBy: "month" | "day" | "hour",
 ): string[] {
   const keys: string[] = [];
   const startKey = getPeriodKeyEST(startDate, groupBy);
   const endKey = getPeriodKeyEST(endDate, groupBy);
-  const current = new Date(startDate);
+  let current = new Date(startDate);
+
   while (getPeriodKeyEST(current, groupBy) <= endKey) {
-    keys.push(getPeriodKeyEST(current, groupBy));
-    if (groupBy === "month") {
-      current.setMonth(current.getMonth() + 1);
-    } else if (groupBy === "day") {
-      current.setDate(current.getDate() + 1);
-    } else {
-      current.setHours(current.getHours() + 1);
-    }
+    const periodKey = getPeriodKeyEST(current, groupBy);
+    keys.push(periodKey);
+
+    // Use EST-aware date addition to avoid timezone issues
+    current = addPeriodEST(current, 1, groupBy);
+
     if (keys.length > 1000) {
-      console.error('generatePeriodKeys infinite loop detected!');
+      console.error("generatePeriodKeys infinite loop detected!");
       break;
     }
   }
@@ -414,21 +438,23 @@ export async function getCounterMonthlyAggregates(
   monthsBack: number = 12,
   authenticated?: boolean,
   shareToken?: string | null,
-  sessionUserId?: number | null
+  sessionUserId?: number | null,
 ) {
-  console.warn('getCounterMonthlyAggregates is deprecated. Use getCounterTimeAggregates with groupBy: "month" instead.');
-  const result = await getCounterTimeAggregates(
-    counterId, 
-    userId, 
-    "month", 
-    monthsBack, 
-    authenticated, 
-    shareToken, 
-    sessionUserId
+  console.warn(
+    'getCounterMonthlyAggregates is deprecated. Use getCounterTimeAggregates with groupBy: "month" instead.',
   );
-  
+  const result = await getCounterTimeAggregates(
+    counterId,
+    userId,
+    "month",
+    monthsBack,
+    authenticated,
+    shareToken,
+    sessionUserId,
+  );
+
   // Convert to old format for backward compatibility
-  return result.map(data => ({
+  return result.map((data) => ({
     month: data.period,
     totalChanges: data.totalChanges,
     netChange: data.netChange,
